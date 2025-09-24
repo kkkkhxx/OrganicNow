@@ -1,73 +1,145 @@
 // src/pages/MaintenanceDetails.jsx
-import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../component/layout";
-import "bootstrap/dist/js/bootstrap.bundle.min.js";
+import Modal from "../component/modal";
+import * as bootstrap from "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
-function Pill({ text, variant = "secondary" }) {
-  const cls =
-    variant === "success"
-      ? "badge bg-success"
-      : variant === "warning"
-      ? "badge bg-warning text-dark"
-      : variant === "danger"
-      ? "badge bg-danger"
-      : variant === "subtle"
-      ? "badge bg-secondary-subtle text-secondary"
-      : "badge bg-secondary";
-  return <span className={cls}>{text}</span>;
-}
+// ตั้งค่า API
+const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080";
 
-export default function MaintenanceDetails() {
+// helper: ดึง yyyy-mm-dd จาก LocalDateTime
+const toDate = (s) => (s ? s.slice(0, 10) : "");
+// helper: แปลง yyyy-mm-dd -> yyyy-mm-ddTHH:mm:ss
+const toLdt = (d) => (d ? `${d}T00:00:00` : null);
+
+function MaintenanceDetails() {
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
-  // ได้มาจาก /maintenancerequest ด้วย navigate(..., { state: { row } })
-  const row = state?.row || state || {};
+  // รองรับรับ id ได้ทั้งจาก state และ query (?id=1)
+  const idFromState = location.state?.id;
+  const idFromQuery = searchParams.get("id");
+  const maintainId = idFromState ?? (idFromQuery ? Number(idFromQuery) : null);
 
-  // Fallback (เปิดหน้านี้ตรง ๆ)
-  const fallback = {
-    id: "RR01",
-    floor: "1",
-    room: "101",
-    target: "Asset",
-    issue: "Air conditioner",
-    maintainType: "Fix",
-    requestDate: "2025-03-11",
-    maintainDate: "2025-03-14",
-    completeDate: "-",
-    state: "Not Started",
-    tenant: {
-      firstName: "John",
-      lastName: "Doe",
-      nationalId: "1-2345-67890-12-3",
-      phone: "012-345-6789",
-      email: "JohnDoe@gmail.com",
-      packageName: "1 Year",
-      signDate: "2024-12-30",
-      startDate: "2024-12-31",
-      endDate: "2025-12-31",
-    },
-    technician: { name: "PSomchai", phone: "012-345-6789" },
+  // โหลดข้อมูล
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const fetchOne = async () => {
+    if (!maintainId) {
+      setErr("Missing maintenance id");
+      return;
+    }
+    try {
+      setLoading(true);
+      setErr("");
+      const res = await fetch(`${API_BASE}/maintain/${maintainId}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const json = await res.json();
+      setData(json);
+    } catch (e) {
+      console.error(e);
+      setErr("Failed to load maintenance.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const data = {
-    ...fallback,
-    ...row,
-    tenant: { ...fallback.tenant, ...(row?.tenant || {}) },
-    technician: { ...fallback.technician, ...(row?.technician || {}) },
+  useEffect(() => {
+    fetchOne();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maintainId]);
+
+  // badge สถานะ (คงสไตล์เดิม)
+  const statusBadge = useMemo(() => {
+    const complete = !!data?.finishDate;
+    return complete ? "bg-success" : "bg-secondary-subtle text-secondary";
+  }, [data]);
+
+  // ------- ฟอร์มใน Modal (สไตล์เดิม) -------
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    issueTitle: "",
+    issueDescription: "",
+    requestDate: "",
+    maintainDate: "",
+    completeDate: "",
+  });
+
+  useEffect(() => {
+    if (!data) return;
+    setForm({
+      issueTitle: data.issueTitle ?? "",
+      issueDescription: data.issueDescription ?? "",
+      requestDate: toDate(data.createDate) || "",
+      maintainDate: toDate(data.scheduledDate) || "",
+      completeDate: toDate(data.finishDate) || "",
+    });
+  }, [data]);
+
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((s) => ({ ...s, [name]: value }));
   };
 
-  const isComplete = String(data.state || "").toLowerCase() === "complete";
+  const handleSave = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+
+      const payload = {
+        issueTitle: form.issueTitle,
+        issueDescription: form.issueDescription,
+        scheduledDate: toLdt(form.maintainDate),
+        finishDate: form.completeDate ? toLdt(form.completeDate) : null,
+      };
+
+      const res = await fetch(`${API_BASE}/maintain/update/${maintainId}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await fetchOne();
+
+      // ปิด modal แบบเดียวกับหน้าเดิม
+      const el = document.getElementById("editMaintainModal");
+      if (el) bootstrap.Modal.getInstance(el)?.hide();
+    } catch (e2) {
+      alert(`Update failed: ${e2.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete maintenance #${maintainId}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/maintain/${maintainId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      navigate("/maintenancerequest");
+    } catch (e) {
+      alert(`Delete failed: ${e.message}`);
+    }
+  };
 
   return (
-    <Layout title="Maintenance Request" icon="pi pi-wrench" notifications={3}>
+    <Layout title="Maintenance Request" icon="bi bi-wrench" notifications={0}>
       <div className="container-fluid">
         <div className="row min-vh-100">
           <div className="col-lg-11 p-4">
-            {/* ===== Toolbar (เหมือน InvoiceDetails) ===== */}
+            {/* Toolbar (เหมือนหน้าเดิม/InvoiceDetails) */}
             <div className="toolbar-wrapper card border-0 bg-white">
               <div className="card-header bg-white border-0 rounded-2">
                 <div className="tm-toolbar d-flex justify-content-between align-items-center">
@@ -80,191 +152,253 @@ export default function MaintenanceDetails() {
                       Maintenance Request
                     </span>
                     <span className="text-muted">›</span>
-                    <span className="breadcrumb-current">{data.id || "RR01"}</span>
+                    <span className="breadcrumb-current">
+                      {data ? `#${data.id} - ${data.roomNumber || "-"}` : "-"}
+                    </span>
                   </div>
-
                   <div className="d-flex align-items-center gap-2">
+                    {/* <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      onClick={handleDelete}
+                    >
+                      <i className="bi bi-trash me-1" /> Delete
+                    </button> */}
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={() =>
-                        navigate("/maintenancerequest", {
-                          state: { edit: true, row: data },
-                        })
-                      }
+                      data-bs-toggle="modal"
+                      data-bs-target="#editMaintainModal"
+                      disabled={!data}
                     >
-                      <i className="bi bi-pencil me-1" /> Edit Request
+                      <i className="bi bi-pencil me-1"></i> Edit Request
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* ===== Details (layout เดียวกับ InvoiceDetails) ===== */}
-            <div className="table-wrapper-detail rounded-0">
+            {err && <div className="alert alert-danger mt-3">{err}</div>}
+
+            {/* Details (เลย์เอาต์ 2 คอลัมน์ + การ์ดเหมือนเดิม) */}
+            <div className="table-wrapper-detail rounded-0 mt-3">
               <div className="row g-4">
                 {/* Left column */}
                 <div className="col-lg-6">
-                  {/* Room Information */}
                   <div className="card border-0 shadow-sm mb-3 rounded-2">
                     <div className="card-body">
                       <h5 className="card-title">Room Information</h5>
-                      <p>
-                        <span className="label">Floor:</span>{" "}
-                        <span className="value">{data.floor}</span>
-                      </p>
-                      <p>
-                        <span className="label">Room:</span>{" "}
-                        <span className="value">{data.room}</span>
-                      </p>
+                      {loading || !data ? (
+                        <div>Loading...</div>
+                      ) : (
+                        <>
+                          <p>
+                            <span className="label">Room:</span>{" "}
+                            <span className="value">{data.roomNumber || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Floor:</span>{" "}
+                            <span className="value">{data.roomFloor ?? "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Target:</span>{" "}
+                            <span className="value">
+                              {data.targetType === 0 ? "Asset" : "Building"}
+                            </span>
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Tenant Information */}
                   <div className="card border-0 shadow-sm rounded-2">
                     <div className="card-body">
-                      <h5 className="card-title">Tenant Information</h5>
-
-                      <div className="row">
-                        <div className="col-sm-6">
+                      <h5 className="card-title">Request Information</h5>
+                      {loading || !data ? (
+                        <div>Loading...</div>
+                      ) : (
+                        <>
                           <p>
-                            <span className="label">First Name:</span>{" "}
-                            <span className="value">{data.tenant.firstName}</span>
+                            <span className="label">Issue title:</span>{" "}
+                            <span className="value">{data.issueTitle || "-"}</span>
                           </p>
                           <p>
-                            <span className="label">Last Name:</span>{" "}
-                            <span className="value">{data.tenant.lastName}</span>
+                            <span className="label">Issue category:</span>{" "}
+                            <span className="value">{data.issueCategory ?? "-"}</span>
                           </p>
                           <p>
-                            <span className="label">National ID:</span>{" "}
-                            <span className="value">{data.tenant.nationalId}</span>
-                          </p>
-                          <p>
-                            <span className="label">Phone Number:</span>{" "}
-                            <span className="value">{data.tenant.phone}</span>
-                          </p>
-                          <p>
-                            <span className="label">Email:</span>{" "}
-                            <span className="value">{data.tenant.email}</span>
-                          </p>
-                        </div>
-
-                        <div className="col-sm-6">
-                          <p className="d-flex align-items-center justify-content-between">
-                            <span className="label">Package:</span>
+                            <span className="label">Description:</span>{" "}
                             <span className="value">
-                              <span className="badge bg-primary">{data.tenant.packageName}</span>
+                              {data.issueDescription || "-"}
                             </span>
                           </p>
-                          <p>
-                            <span className="label">Sign date:</span>{" "}
-                            <span className="value">{data.tenant.signDate}</span>
-                          </p>
-                          <p>
-                            <span className="label">Start date:</span>{" "}
-                            <span className="value">{data.tenant.startDate}</span>
-                          </p>
-                          <p>
-                            <span className="label">End date:</span>{" "}
-                            <span className="value">{data.tenant.endDate}</span>
-                          </p>
-                        </div>
-                      </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 {/* Right column */}
                 <div className="col-lg-6">
-                  {/* Request Information */}
                   <div className="card border-0 shadow-sm mb-3 rounded-2">
                     <div className="card-body">
-                      <h5 className="card-title">Request Information</h5>
-
-                      <div className="row">
-                        <div className="col-6">
-                          <p>
-                            <span className="label">Target:</span>{" "}
-                            <span className="value">
-                              <span className="badge bg-secondary-subtle text-secondary">
-                                {data.target || "Asset"}
+                      <h5 className="card-title">Schedule</h5>
+                      {loading || !data ? (
+                        <div>Loading...</div>
+                      ) : (
+                        <div className="row">
+                          <div className="col-6">
+                            <p>
+                              <span className="label">Create date:</span>{" "}
+                              <span className="value">{toDate(data.createDate) || "-"}</span>
+                            </p>
+                            <p>
+                              <span className="label">Maintain date:</span>{" "}
+                              <span className="value">
+                                {toDate(data.scheduledDate) || "-"}
                               </span>
-                            </span>
-                          </p>
-                          <p>
-                            <span className="label">Maintain type:</span>{" "}
-                            <span className="value">
-                              <span className="badge bg-danger-subtle text-danger">
-                                {data.maintainType || "Fix"}
+                            </p>
+                          </div>
+                          <div className="col-6">
+                            <p>
+                              <span className="label">Complete date:</span>{" "}
+                              <span className="value">
+                                {toDate(data.finishDate) || "-"}
                               </span>
-                            </span>
-                          </p>
-                          <p>
-                            <span className="label">Maintain date:</span>{" "}
-                            <span className="value">{data.maintainDate}</span>
-                          </p>
+                            </p>
+                            <p>
+                              <span className="label">Status:</span>{" "}
+                              <span className="value">
+                                <span className={`badge ${statusBadge}`}>
+                                  <i className="bi bi-circle-fill me-1"></i>
+                                  {data.finishDate ? "Complete" : "Not Started"}
+                                </span>
+                              </span>
+                            </p>
+                          </div>
                         </div>
-
-                        <div className="col-6">
-                          <p>
-                            <span className="label">Issue:</span>{" "}
-                            <span className="value">{data.issue || "-"}</span>
-                          </p>
-                          <p>
-                            <span className="label">Request date:</span>{" "}
-                            <span className="value">{data.requestDate}</span>
-                          </p>
-                          <p>
-                            <span className="label">State:</span>{" "}
-                            <span className="value">
-                              {isComplete ? (
-                                <Pill text="Complete" variant="success" />
-                              ) : (
-                                <Pill text="Not Started" variant="subtle" />
-                              )}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="row">
-                        <div className="col-6">
-                          <p>
-                            <span className="label">Complete date:</span>{" "}
-                            <span className="value">{data.completeDate || "-"}</span>
-                          </p>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Technician Information */}
-                  <div className="card border-0 shadow-sm rounded-2">
-                    <div className="card-body">
-                      <h5 className="card-title">Technician Information</h5>
-                      <div className="row">
-                        <div className="col-6">
-                          <p>
-                            <span className="label">Technician’s name:</span>{" "}
-                            <span className="value">{data.technician.name}</span>
-                          </p>
-                        </div>
-                        <div className="col-6">
-                          <p>
-                            <span className="label">Phone Number:</span>{" "}
-                            <span className="value">{data.technician.phone}</span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {/* เผื่ออนาคต: Technician หรือ Cost ฯลฯ */}
+                  {/* <div className="card border-0 shadow-sm rounded-2"> ... </div> */}
                 </div>
-                {/* /Right */}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ===== Modal Edit (คงรูปแบบเดียวกับหน้าที่คุณใช้) ===== */}
+      <Modal
+        id="editMaintainModal"
+        title="Edit Request"
+        icon="bi bi-pencil"
+        size="modal-lg"
+        scrollable="modal-dialog-scrollable"
+      >
+        {!data ? (
+          <div className="p-3">Loading...</div>
+        ) : (
+          <form onSubmit={handleSave}>
+            {/* Room (lock ไม่ให้แก้ เพื่อคง UX เดิม) */}
+            <div className="row g-3 align-items-start">
+              <div className="col-md-3"><strong>Room Information</strong></div>
+              <div className="col-md-9">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Room</label>
+                    <input type="text" className="form-control" value={data.roomNumber || ""} disabled />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Floor</label>
+                    <input type="text" className="form-control" value={data.roomFloor ?? ""} disabled />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr className="my-4" />
+
+            {/* Request */}
+            <div className="row g-3 align-items-start">
+              <div className="col-md-3"><strong>Request Information</strong></div>
+              <div className="col-md-9">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Issue title</label>
+                    <input
+                      className="form-control"
+                      name="issueTitle"
+                      value={form.issueTitle}
+                      onChange={onChange}
+                      required
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Create date</label>
+                    <input type="date" className="form-control" value={form.requestDate} disabled />
+                  </div>
+                  <div className="col-md-12">
+                    <label className="form-label">Description</label>
+                    <textarea
+                      className="form-control"
+                      rows={4}
+                      name="issueDescription"
+                      value={form.issueDescription}
+                      onChange={onChange}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr className="my-4" />
+
+            {/* Schedule */}
+            <div className="row g-3 align-items-start">
+              <div className="col-md-3"><strong>Schedule</strong></div>
+              <div className="col-md-9">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Maintain date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      name="maintainDate"
+                      value={form.maintainDate}
+                      onChange={onChange}
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Complete date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      name="completeDate"
+                      value={form.completeDate}
+                      onChange={onChange}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="d-flex justify-content-center gap-3 pt-4 pb-2">
+              <button type="button" className="btn btn-outline-secondary" data-bs-dismiss="modal">
+                Cancel
+              </button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </Layout>
   );
 }
+
+export default MaintenanceDetails;

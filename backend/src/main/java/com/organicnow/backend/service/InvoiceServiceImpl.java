@@ -4,8 +4,10 @@ import com.organicnow.backend.dto.CreateInvoiceRequest;
 import com.organicnow.backend.dto.InvoiceDto;
 import com.organicnow.backend.dto.UpdateInvoiceRequest;
 import com.organicnow.backend.model.Invoice;
+import com.organicnow.backend.repository.ContractRepository;
 import com.organicnow.backend.repository.InvoiceRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,12 +18,15 @@ import java.util.Optional;
 public class InvoiceServiceImpl implements InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
-    // private final ContractRepository contractRepository; // ถ้ามีค่อยเปิดใช้
+    private final ContractRepository contractRepository;
 
-    public InvoiceServiceImpl(InvoiceRepository invoiceRepository) {
+    public InvoiceServiceImpl(InvoiceRepository invoiceRepository,
+                              ContractRepository contractRepository) {
         this.invoiceRepository = invoiceRepository;
+        this.contractRepository = contractRepository;
     }
 
+    // ===== CRUD =====
     @Override
     public List<InvoiceDto> getAllInvoices() {
         List<Invoice> invoices = invoiceRepository.findAll();
@@ -73,20 +78,74 @@ public class InvoiceServiceImpl implements InvoiceService {
         inv.setPenaltyTotal(penalty);
         inv.setNetAmount(netAmount);
 
-        // ถ้าอยากผูก Contract:
-        // if (request.getContractId() != null) {
-        //     Contract contract = contractRepository.findById(request.getContractId())
-        //         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contract not found"));
-        //     inv.setContact(contract); // ชื่อฟิลด์ต้องตรงกับ entity (contact/contract)
-        // }
+        // ต้องผูก Contract (contact) เพราะ nullable=false
+        if (request.getContractId() == null) {
+            throw new RuntimeException("contractId is required");
+        }
+        var contract = contractRepository.findById(request.getContractId())
+                .orElseThrow(() -> new RuntimeException("Contract not found: " + request.getContractId()));
+        inv.setContact(contract);
 
         Invoice saved = invoiceRepository.save(inv);
         return convertToDto(saved);
     }
 
     @Override
+    @Transactional
     public InvoiceDto updateInvoice(Long id, UpdateInvoiceRequest request) {
-        throw new UnsupportedOperationException("updateInvoice not implemented yet");
+        Invoice inv = invoiceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Invoice not found: " + id));
+
+        // ===== วันที่ครบกำหนด =====
+        if (request.getDueDate() != null) {
+            inv.setDueDate(request.getDueDate());
+        }
+
+        // ===== สถานะ / วันจ่ายจริง =====
+        if (request.getInvoiceStatus() != null) {
+            inv.setInvoiceStatus(request.getInvoiceStatus());
+
+            // ถ้า set เป็นชำระแล้ว(1) แต่ไม่ส่ง payDate และยังไม่มีค่า → ตั้งเป็น now()
+            if (request.getInvoiceStatus() == 1 && request.getPayDate() == null && inv.getPayDate() == null) {
+                inv.setPayDate(LocalDateTime.now());
+            }
+        }
+        if (request.getPayDate() != null) {
+            inv.setPayDate(request.getPayDate());
+        }
+
+        // ===== วิธีชำระ =====
+        if (request.getPayMethod() != null) {
+            inv.setPayMethod(request.getPayMethod());
+        }
+
+        // ===== ยอดเงิน =====
+        boolean amountTouched = false;
+        if (request.getSubTotal() != null) {
+            inv.setSubTotal(Math.max(0, request.getSubTotal()));
+            amountTouched = true;
+        }
+        if (request.getPenaltyTotal() != null) {
+            inv.setPenaltyTotal(Math.max(0, request.getPenaltyTotal()));
+            amountTouched = true;
+        }
+
+        if (request.getPenaltyAppliedAt() != null) {
+            inv.setPenaltyAppliedAt(request.getPenaltyAppliedAt());
+        }
+
+        if (request.getNetAmount() != null) {
+            inv.setNetAmount(Math.max(0, request.getNetAmount()));
+        } else if (amountTouched) {
+            int st = inv.getSubTotal() != null ? inv.getSubTotal() : 0;
+            int pt = inv.getPenaltyTotal() != null ? inv.getPenaltyTotal() : 0;
+            inv.setNetAmount(st + pt);
+        }
+
+        // notes: Entity ยังไม่มีฟิลด์นี้ — ไม่ทำอะไร
+
+        Invoice saved = invoiceRepository.save(inv);
+        return convertToDto(saved);
     }
 
     @Override
@@ -96,7 +155,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
     }
 
-    // ===== พวกเมธอดค้นหา/ฟิลเตอร์: ไว้เติมภายหลัง =====
+    // ===== Search/Filter (ยังไม่ implement) =====
     @Override public List<InvoiceDto> searchInvoices(String query) { return List.of(); }
     @Override public List<InvoiceDto> getInvoicesByContractId(Long contractId) { return List.of(); }
     @Override public List<InvoiceDto> getInvoicesByRoomId(Long roomId) { return List.of(); }
