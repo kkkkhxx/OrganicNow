@@ -25,6 +25,7 @@ public class TenantDetailDto {
     private BigDecimal packagePrice;
 
     // Contract
+    private LocalDateTime signDate;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Integer status;

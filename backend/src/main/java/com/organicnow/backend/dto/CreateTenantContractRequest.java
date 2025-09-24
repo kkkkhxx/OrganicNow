@@ -18,6 +18,7 @@ public class CreateTenantContractRequest {
     private Long packageId;
 
     // contract
+    private LocalDateTime signDate;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private BigDecimal deposit;

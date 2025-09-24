@@ -19,6 +19,7 @@ public class UpdateTenantContractRequest {
     private Long packageId;
 
     // contract
+    private LocalDateTime signDate;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Integer status; // 0,1,2,3

@@ -14,7 +14,6 @@ function TenantDetail() {
   const [leftHeight, setLeftHeight] = useState(0);
   const [tenant, setTenant] = useState(null);
 
-  // ✅ state สำหรับ modal edit
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -29,7 +28,10 @@ function TenantDetail() {
   const navigate = useNavigate();
   const { contractId } = useParams();
 
-  // จับความสูงฝั่งซ้าย → set ให้ขวาเท่ากัน
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState(""); 
+  const [showAlert, setShowAlert] = useState(false);
+
   useEffect(() => {
     if (!tenantInfoRef.current) return;
     const observer = new ResizeObserver(([entry]) => {
@@ -39,33 +41,31 @@ function TenantDetail() {
     return () => observer.disconnect();
   }, []);
 
-  // fetch detail จาก backend
-  useEffect(() => {
-    const fetchTenantDetail = async () => {
-      try {
-        const res = await axios.get(`${apiPath}/tenant/${contractId}`, {
-          withCredentials: true,
-        });
-        setTenant(res.data);
+  const fetchTenantDetail = async () => {
+    try {
+      const res = await axios.get(`${apiPath}/tenant/${contractId}`, {
+        withCredentials: true,
+      });
+      setTenant(res.data);
+      setFirstName(res.data.firstName || "");
+      setLastName(res.data.lastName || "");
+      setEmail(res.data.email || "");
+      setPhoneNumber(res.data.phoneNumber || "");
+      setNationalId(res.data.nationalId || "");
+      setEndDate(res.data.endDate?.split("T")[0] || "");
+      setDeposit(res.data.deposit || "");
+      setRentAmountSnapshot(res.data.rentAmountSnapshot || "");
+      setSignDate(res.data.signDate?.split("T")[0] || "");
+      setStartDate(res.data.startDate?.split("T")[0] || "");
+    } catch (err) {
+      console.error("Error fetching tenant detail:", err);
+      navigate("/tenantmanagement");
+    }
+  };  
 
-        // ✅ set ค่าให้ state สำหรับ modal
-        setFirstName(res.data.firstName || "");
-        setLastName(res.data.lastName || "");
-        setEmail(res.data.email || "");
-        setPhoneNumber(res.data.phoneNumber || "");
-        setNationalId(res.data.nationalId || "");
-        setEndDate(res.data.endDate?.split("T")[0] || "");
-        setDeposit(res.data.deposit || "");
-        setRentAmountSnapshot(res.data.rentAmountSnapshot || "");
-        setSignDate(res.data.signDate?.split("T")[0] || "");
-        setStartDate(res.data.startDate?.split("T")[0] || "");
-      } catch (err) {
-        console.error("Error fetching tenant detail:", err);
-        navigate("/tenantmanagement");
-      }
-    };
+  useEffect(() => {
     if (contractId) fetchTenantDetail();
-  }, [contractId, navigate]);
+  }, [contractId]);
 
   const mapStatus = (status) => {
     switch (status) {
@@ -82,7 +82,7 @@ function TenantDetail() {
 
   const getStatusColor = (status, penaltyTotal) => {
     if (penaltyTotal && penaltyTotal > 0) {
-      return "status-danger"; // ถ้ามี penalty → แดง
+      return "status-danger";  
     }
     switch (status) {
       case 0:
@@ -96,7 +96,6 @@ function TenantDetail() {
     }
   };
 
-  //======= กัน tenant เป็น null ตอน render =======//
   if (!tenant) {
     return (
       <Layout title="Tenant Management" icon="pi pi-user">
@@ -105,26 +104,39 @@ function TenantDetail() {
     );
   }
 
+  const showMessageError = (msg) => {
+    setAlertMessage("❌ Error: " + msg);
+    setAlertType("error");
+    setShowAlert(true);
+  };
+  const showMessageSave = (msg = "✅ Success!") => {
+    setAlertMessage(msg);
+    setAlertType("success");
+    setShowAlert(true);
+  };
+
   const handleSaveUpdate = async () => {
+    if (!contractId) {
+      showMessageError("Missing contractId");
+      return false;
+    }
+
+    const payload = {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      nationalId,
+      startDate: startDate ? `${startDate}T00:00:00` : null,
+      endDate: endDate ? `${endDate}T23:59:59` : null,
+      deposit,
+      rentAmountSnapshot,
+      signDate: signDate ? `${signDate}T00:00:00` : new Date().toISOString(),
+    };
+
+    if (checkValidation(payload) === false) return false;
+
     try {
-      if (!contractId) {
-        alert("Missing contractId");
-        return false;
-      }
-
-      const payload = {
-        firstName,
-        lastName,
-        email,
-        phoneNumber,
-        nationalId,
-        startDate: startDate ? `${startDate}T00:00:00` : null,
-        endDate: endDate ? `${endDate}T23:59:59` : null,
-        deposit,
-        rentAmountSnapshot,
-        signDate: signDate ? `${signDate}T00:00:00` : new Date().toISOString(),
-      };
-
       const res = await axios.put(
         `${apiPath}/tenant/update/${contractId}`,
         payload,
@@ -132,15 +144,48 @@ function TenantDetail() {
       );
 
       if (res.status === 200) {
+        await fetchTenantDetail();
         document.getElementById("modalForm_btnClose")?.click();
-        alert("✅ Update tenant success!");
+        showMessageSave("อัปเดตข้อมูลสำเร็จ!");
       } else {
-        alert("❌ Unexpected response: " + JSON.stringify(res.data));
+        showMessageError("Unexpected response: " + JSON.stringify(res.data));
       }
     } catch (e) {
       console.error("Update tenant error:", e);
-      alert("❌ Error: " + (e.response?.data?.message || e.message));
+      showMessageError(e.response?.data?.message || e.message);
     }
+  };
+
+  const checkValidation = (payload) => {
+    if (!payload.firstName) {
+      showMessageError("กรุณากรอก First Name");
+      return false;
+    }
+    if (!payload.lastName) {
+      showMessageError("กรุณากรอก Last Name");
+      return false;
+    }
+    if (!payload.phoneNumber) {
+      showMessageError("กรุณากรอก Phone Number");
+      return false;
+    }
+    if (!/^\d{10}$/.test(payload.phoneNumber)) {
+      showMessageError("Phone Number ต้องเป็นตัวเลข 10 หลัก");
+      return false;
+    }
+    if (!payload.email) {
+      showMessageError("กรุณากรอก Email");
+      return false;
+    }
+
+    const sign = new Date(payload.signDate);
+    const start = new Date(payload.startDate);
+    if (start < sign) {
+      showMessageError("Start Date ต้องมากกว่าหรือเท่ากับ Sign Date");
+      return false;
+    }
+
+    return true;
   };
 
   return (
@@ -169,9 +214,6 @@ function TenantDetail() {
                   </div>
                   {/* Right cluster */}
                   <div className="d-flex align-items-center gap-2">
-                    <button className="btn btn-outline-light text-danger border-0">
-                      <i className="bi bi-trash"></i>
-                    </button>
                     <button
                       type="button"
                       className="btn btn-primary"
@@ -308,21 +350,19 @@ function TenantDetail() {
                                   >
                                     <div className="row mb-1">
                                       <div className="col-4">
-                                        <span className="label">
-                                          Invoice date:
-                                        </span>
+                                        <span className="label">Invoice date:  </span>
                                         <span className="value">
                                           {inv.dueDate?.split("T")[0] || "-"}
                                         </span>
                                       </div>
                                       <div className="col-4">
-                                        <span className="label">Invoice ID:</span>
+                                        <span className="label">Invoice ID: </span>
                                         <span className="value">
                                           {inv.invoiceId}
                                         </span>
                                       </div>
                                       <div className="col-4">
-                                        <span className="label">NET:</span>
+                                        <span className="label">NET:  </span>
                                         <span className="value">
                                           {inv.netAmount} Baht
                                         </span>
@@ -330,19 +370,19 @@ function TenantDetail() {
                                     </div>
                                     <div className="row">
                                       <div className="col-4">
-                                        <span className="label">Status:</span>
+                                        <span className="label">Status:  </span>
                                         <span className="value">
                                           {mapStatus(inv.invoiceStatus)}
                                         </span>
                                       </div>
                                       <div className="col-4">
-                                        <span className="label">Pay date:</span>
+                                        <span className="label">Pay date: </span>
                                         <span className="value">
                                           {inv.payDate?.split("T")[0] || "-"}
                                         </span>
                                       </div>
                                       <div className="col-4">
-                                        <span className="label">Penalty:</span>
+                                        <span className="label">Penalty: </span>
                                         <span className="value">
                                           {inv.penaltyTotal || "-"}
                                         </span>
@@ -379,7 +419,6 @@ function TenantDetail() {
           onSubmit={(e) => {
             e.preventDefault();
             handleSaveUpdate();
-            fetchTenantDetail()
           }}
         >
           {/* ---------- General Information ---------- */}
@@ -416,10 +455,15 @@ function TenantDetail() {
               <div className="col-md-6">
                 <label className="form-label">Phone Number</label>
                 <input
-                  type="tel"
+                  type="text"
                   className="form-control"
+                  placeholder="Tenant Phone Number"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, ""); 
+                    if (val.length <= 10) setPhoneNumber(val);     
+                  }}
+                  maxLength={10}
                 />
               </div>
               <div className="col-md-6">
@@ -526,6 +570,7 @@ function TenantDetail() {
               type="button"
               className="btn btn-outline-secondary"
               data-bs-dismiss="modal"
+              id="modalForm_btnClose" 
             >
               Cancel
             </button>
@@ -535,6 +580,25 @@ function TenantDetail() {
           </div>
         </form>
       </Modal>
+      {showAlert && (
+        <div className="custom-alert-overlay">
+          <div className="custom-alert-box">
+            <div className={`custom-alert-icon ${alertType}`}>
+              {alertType === "success" ? "✔️" : "❌"}
+            </div>
+            <div className="custom-alert-title">
+              {alertType === "success" ? "Success" : "Error"}
+            </div>
+            <div className="custom-alert-message">{alertMessage}</div>
+            <button
+              className="custom-alert-btn"
+              onClick={() => setShowAlert(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

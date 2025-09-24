@@ -6,6 +6,8 @@ import com.organicnow.backend.dto.TenantDetailDto;
 import com.organicnow.backend.dto.UpdateTenantContractRequest;
 import com.organicnow.backend.service.TenantService;
 import com.organicnow.backend.service.TenantContractService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,20 +25,20 @@ public class TenantController {
         this.tenantContractService = tenantContractService;
     }
 
-    // List (join contract + tenant + room + package)
+    // ✅ List (join contract + tenant + room + package)
     @GetMapping("/list")
     public ResponseEntity<?> list() {
         return ResponseEntity.ok(tenantService.list());
     }
 
-    // Create tenant + contract
+    // ✅ Create tenant + contract
     @PostMapping("/create")
     public ResponseEntity<TenantDto> create(@RequestBody CreateTenantContractRequest req) {
         TenantDto dto = tenantContractService.create(req);
         return ResponseEntity.status(201).body(dto);
     }
 
-    // Update by contractId
+    // ✅ Update by contractId
     @PutMapping("/update/{contractId}")
     public ResponseEntity<TenantDto> update(@PathVariable Long contractId,
                                             @RequestBody UpdateTenantContractRequest req) {
@@ -44,17 +46,29 @@ public class TenantController {
         return ResponseEntity.ok(dto);
     }
 
-    // Delete contract (soft: ลบเฉพาะ contract)
+    // ✅ Delete contract (soft: ลบเฉพาะ contract)
     @DeleteMapping("/delete/{contractId}")
     public ResponseEntity<Void> delete(@PathVariable Long contractId) {
         tenantContractService.delete(contractId);
         return ResponseEntity.noContent().build();
     }
-    // Detail by contractId
-    // ใช้ regex บอกว่า contractId ต้องเป็นตัวเลขเท่านั้น
+
+    // ✅ Detail by contractId (เฉพาะตัวเลข)
     @GetMapping("/{contractId:\\d+}")
     public ResponseEntity<TenantDetailDto> detail(@PathVariable Long contractId) {
         TenantDetailDto dto = tenantContractService.getDetail(contractId);
         return ResponseEntity.ok(dto);
+    }
+
+    // ✅ Download Contract PDF
+    @GetMapping("/{contractId:\\d+}/pdf")
+    public ResponseEntity<byte[]> downloadContractPdf(@PathVariable Long contractId) {
+        byte[] pdfBytes = tenantContractService.generateContractPdf(contractId);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=tenant_" + contractId + "_contract.pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfBytes);
     }
 }

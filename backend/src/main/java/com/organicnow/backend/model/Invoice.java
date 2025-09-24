@@ -16,7 +16,7 @@ public class Invoice {
     private Long id; // Invoice_id
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "contact_id", nullable = false,
+    @JoinColumn(name = "contract_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_invoice_contact"))
     private Contract contact;   // Contact_id.Contact
 

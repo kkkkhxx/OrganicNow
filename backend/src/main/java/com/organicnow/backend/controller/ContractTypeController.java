@@ -10,7 +10,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/contract-types")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class ContractTypeController {
 
     private final ContractTypeService contractTypeService;

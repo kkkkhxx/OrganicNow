@@ -43,8 +43,7 @@ public class Maintain {
     @Column(name = "issue_title", nullable = false, length = 200)
     private String issueTitle; // issue_title
 
-    @Lob
-    @Column(name = "issue_description")
+    @Column(name = "issue_description", columnDefinition = "TEXT")
     private String issueDescription; // issue_description
 
     @Column(name = "create_date", nullable = false)

@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
+import useMessage from "../component/useMessage"; 
 import Pagination from "../component/pagination";
 import { pageSize as defaultPageSize, apiPath } from "../config_variable";
 import "../assets/css/tenantmanagement.css";
+import "../assets/css/alert.css"; 
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -17,27 +19,36 @@ function TenantManagement() {
   const [pageSize, setPageSize] = useState(defaultPageSize);
 
   const [data, setData] = useState([]);
-  const [tenantId, setTenantId] = useState(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [nationalId, setNationalId] = useState("");
-  const [signDate, setSignDate] = useState("");
+  const [signDate, setSignDate] = useState(() => { return new Date().toISOString().split("T")[0];});
   const [endDate, setEndDate] = useState("");
   const [deposit, setDeposit] = useState(0);
   const [rentAmountSnapshot, setRentAmountSnapshot] = useState(0);
   const [packageId, setPackageId] = useState("");
   const [startDate, setStartDate] = useState("");
-  // Floor / Room (dependent selects)
   const [rooms, setRooms] = useState([]);
   const [selectedFloor, setSelectedFloor] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState("");
 
+  const [packages, setPackages] = useState([]);
+  const [allPackages, setAllPackages] = useState([]);
+
   const navigate = useNavigate();
+  const [occupiedRoomIds, setOccupiedRoomIds] = useState([]);
+  const {
+    showMessagePermission,
+    showMessageError,
+    showMessageSave,
+    showMessageConfirmDelete,
+    showMessageAdjust,
+  } = useMessage();
 
   const formatDate = (v) => {
-    if (!v) return "";
+    if (!v) return "-"; 
     try {
       const d = new Date(v);
       const yyyy = d.getFullYear();
@@ -49,18 +60,31 @@ function TenantManagement() {
     }
   };
 
-  const [packages, setPackages] = useState([]);
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        const res = await axios.get("http://localhost:8080/packages", {
+        const res = await axios.get(`${apiPath}/packages`, {
           withCredentials: true,
         });
+
         if (Array.isArray(res.data)) {
-          setPackages(res.data);
+          // เก็บทั้งหมด
+          setAllPackages(res.data);
+
+          // เก็บเฉพาะ active + เรียง
+          const activeSorted = res.data
+            .filter((p) => p.is_active === 1)
+            .sort((a, b) => a.duration - b.duration);
+          setPackages(activeSorted);
+        } else {
+          console.warn("Unexpected packages API format:", res.data);
+          setAllPackages([]);
+          setPackages([]);
         }
       } catch (err) {
         console.error("Error fetching packages:", err);
+        setAllPackages([]);
+        setPackages([]);
       }
     };
 
@@ -78,19 +102,21 @@ function TenantManagement() {
     }
   }, [packageId, packages]);
 
+  const packageLabel = (pkgId) => {
+    const pkg = allPackages.find((p) => p.id === pkgId);
+    return pkg ? pkg.contract_name : "-";
+  };
+
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get("http://localhost:8080/rooms", {
+        const res = await axios.get(`${apiPath}/rooms`, {
           withCredentials: true,
         });
-        console.log("Rooms API data:", res.data); // debug ดูว่า API ส่งอะไรมาจริงๆ
-
         if (Array.isArray(res.data)) {
-          setRooms(res.data); // กรณี backend ส่ง array ตรง ๆ
+          setRooms(res.data);
         } else if (Array.isArray(res.data.result)) {
-          setRooms(res.data.result); // ✅ กรณี backend ห่อด้วย result
-          console.log(rooms);
+          setRooms(res.data.result);
         } else {
           console.warn("Unexpected rooms API format:", res.data);
           setRooms([]);
@@ -104,19 +130,15 @@ function TenantManagement() {
     fetchRooms();
   }, []);
 
-  const packageLabel = (pkgId) => {
-    const pkg = packages.find((p) => p.id === pkgId);
-    return pkg ? pkg.contract_name : "-";
-  };
 
   const packageColor = (contractName) => {
     const map = {
-      "3 เดือน": "#FFC73B", // น้ำเงิน
-      "6 เดือน": "#EF98C4", // เขียว
-      "9 เดือน": "#87C6FF", // เหลือง
-      "1 ปี": "#9691F9", // แดง
+      "3 เดือน": "#FFC73B",
+      "6 เดือน": "#EF98C4",
+      "9 เดือน": "#87C6FF",
+      "1 ปี": "#9691F9",
     };
-    return map[contractName] || "#D3D3D3"; // default เทา
+    return map[contractName] || "#D3D3D3";
   };
 
   const fetchData = async (page = 1) => {
@@ -127,27 +149,40 @@ function TenantManagement() {
       });
 
       if (Array.isArray(res.data)) {
+        // ✅ กรณี backend ส่งเป็น array ตรง ๆ
         const rows = res.data;
         setData(rows);
+
         setTotalRecords(rows.length);
         setTotalPages(Math.max(1, Math.ceil(rows.length / pageSize)));
       } else if (res.data && Array.isArray(res.data.results)) {
-        setData(res.data.results);
-        const total = Number(res.data.totalRecords ?? res.data.results.length);
+        // ✅ กรณี backend ส่งเป็น object { totalRecords, results }
+        const rows = res.data.results;
+        setData(rows);
+
+        const total = Number(res.data.totalRecords ?? rows.length);
         setTotalRecords(total);
         setTotalPages(Math.max(1, Math.ceil(total / pageSize)));
       } else {
+        // ✅ กรณีไม่ใช่ format ที่คาดไว้
         setData([]);
         setTotalRecords(0);
         setTotalPages(1);
       }
 
       setCurrentPage(page);
+
+      // ✅ refresh ห้องที่ไม่ว่างจาก backend โดยตรง
+      await fetchOccupiedRooms();
+
     } catch (err) {
       console.error("Error fetching tenants:", err);
       setData([]);
       setTotalRecords(0);
       setTotalPages(1);
+
+      // ✅ เคลียร์ occupied rooms ด้วย
+      setOccupiedRoomIds([]);
     }
   };
 
@@ -184,7 +219,7 @@ function TenantManagement() {
         endDate: endDate ? `${endDate}T23:59:59` : null,
         deposit,
         rentAmountSnapshot,
-        signDate: new Date().toISOString(),
+        signDate: signDate ? `${signDate}T00:00:00` : null,
       };
 
       if (checkValidation(payload) === false) return false;
@@ -194,46 +229,46 @@ function TenantManagement() {
       });
 
       if (res.status === 200 || res.status === 201) {
-        // ✅ ปิด modal
         document.getElementById("modalForm_btnClose")?.click();
-
-        // ✅ refresh ตาราง
         fetchData(currentPage);
-
-        // ✅ แจ้งเตือน
         showMessageSave();
       } else {
         showMessageError("Unexpected response: " + JSON.stringify(res.data));
       }
     } catch (e) {
-      if (e.response && e.response.status === 409) {
-        if (e.response.data.message === "duplicate_email") {
-          setAlertvalidation?.("Email already exists");
-        } else if (e.response.data.message === "duplicate_national_id") {
-          setAlertvalidation?.("National ID already exists");
+      if (e.response) {
+        console.error("🔴 Backend error response:", e.response);
+
+        if (e.response.status === 409) {
+          const msg = e.response.data?.message || "";
+
+          switch (true) {
+            case msg === "duplicate_national_id":
+            case msg.includes("duplicate_national_id"):
+              showMessageError("NationalID Already Exists");
+              return;
+
+            default:
+              showMessageError(msg || "Conflict error");
+              return;
+          }
         }
-        return false;
-      }
-      if (e.response && e.response.status === 401) {
-        showMessagePermission?.();
+
+        if (e.response.status === 401) {
+          showMessagePermission?.();
+          return;
+        }
+
+        showMessageError(
+          e.response.data?.message || `Server error (${e.response.status})`
+        );
       } else {
-        showMessageError(e);
+        showMessageError(e.message || "Unexpected error");
       }
     }
   };
 
-  const handleEdit = (item) => {
-    setTenantId(item.tenantId);
-    setFirstName(item.firstName || "");
-    setLastName(item.lastName || "");
-    setEmail(item.email || "");
-    setPhoneNumber(item.phoneNumber || "");
-    setNationalId(item.nationalId || "");
-    setAlertvalidation?.("");
-  };
-
   const checkValidation = (payload) => {
-    // 🔹 General Information
     if (!payload.firstName) {
       showMessageError("กรุณากรอก First Name");
       return false;
@@ -242,26 +277,30 @@ function TenantManagement() {
       showMessageError("กรุณากรอก Last Name");
       return false;
     }
-    if (!payload.email) {
-      showMessageError("กรุณากรอก Email");
+    if (!payload.nationalId) {
+      showMessageError("กรุณากรอก National ID");
+      return false;
+    }
+    if (!/^\d{13}$/.test(payload.nationalId)) {
+      showMessageError("National ID ต้องเป็นตัวเลข 13 หลัก");
       return false;
     }
     if (!payload.phoneNumber) {
       showMessageError("กรุณากรอก Phone Number");
       return false;
     }
-    if (!payload.nationalId) {
-      showMessageError("กรุณากรอก National ID");
+    if (!/^\d{10}$/.test(payload.phoneNumber)) {
+      showMessageError("Phone Number ต้องเป็นตัวเลข 10 หลัก");
       return false;
     }
-
-    // 🔹 Room Information
+    if (!payload.email) {
+      showMessageError("กรุณากรอก Email");
+      return false;
+    }
     if (!payload.roomId) {
       showMessageError("กรุณาเลือกห้อง");
       return false;
     }
-
-    // 🔹 Contract Information
     if (!payload.packageId) {
       showMessageError("กรุณาเลือก Package");
       return false;
@@ -275,50 +314,14 @@ function TenantManagement() {
       return false;
     }
 
-    return true;
-  };
-
-  const handleSaveUpdate = async () => {
-    try {
-      if (!tenantId) {
-        setAlertvalidation?.("Missing tenantId");
-        return false;
-      }
-      if (checkValidation && checkValidation() === false) return false;
-
-      const payload = { firstName, lastName, email, phoneNumber, nationalId };
-
-      const res = await axios.put(
-        `${apiPath}/tenant/update/${tenantId}`,
-        payload,
-        {
-          withCredentials: true,
-        }
-      );
-
-      if (res.status === 200) {
-        document.getElementById("modalForm_btnClose")?.click();
-        showMessageSave?.();
-        fetchData(currentPage);
-      } else {
-        showMessageError?.("Unexpected response: " + JSON.stringify(res.data));
-      }
-    } catch (e) {
-      if (e.response && e.response.status === 409) {
-        const msg = e.response.data?.message;
-        if (msg === "duplicate_email")
-          setAlertvalidation?.("Email already exists");
-        else if (msg === "duplicate_national_id")
-          setAlertvalidation?.("National ID already exists");
-        else setAlertvalidation?.("Duplicate data");
-        return false;
-      }
-      if (e.response && e.response.status === 401) {
-        showMessagePermission?.();
-      } else {
-        showMessageError?.(e);
-      }
+    const sign = new Date(payload.signDate);
+    const start = new Date(payload.startDate);
+    if (start < sign) {
+      showMessageError("Start Date ต้องมากกว่าหรือเท่ากับ Sign Date");
+      return false;
     }
+
+    return true;
   };
 
   const handleDelete = async (contractId) => {
@@ -333,16 +336,16 @@ function TenantManagement() {
       });
 
       if (res.status === 204) {
-        showMessageSave?.("ลบข้อมูลสำเร็จ");
+        showMessageSave("ลบข้อมูลสำเร็จ");
         fetchData(currentPage);
       } else {
-        showMessageError?.("Unexpected response: " + res.status);
+        showMessageError("Unexpected response: " + res.status);
       }
     } catch (e) {
       if (e.response && e.response.status === 401) {
         showMessagePermission?.();
       } else {
-        showMessageError?.(e);
+        showMessageError(e);
       }
     }
   };
@@ -359,33 +362,136 @@ function TenantManagement() {
     setEmail("");
     setPhoneNumber("");
     setNationalId("");
-    setSelectedFloor(""); // ✅ reset floor
+    setSelectedFloor("");
     setSelectedRoomId("");
     setPackageId("");
+    fetchOccupiedRooms();
   };
 
   useEffect(() => {
     if (startDate && packageId) {
       const pkg = packages.find((p) => p.id === parseInt(packageId));
       if (pkg && pkg.duration) {
-        const start = new Date(startDate);
-        const end = new Date(start);
-        end.setMonth(end.getMonth() + pkg.duration); // ✅ บวกเดือน
-        const yyyy = end.getFullYear();
-        const mm = String(end.getMonth() + 1).padStart(2, "0");
-        const dd = String(end.getDate()).padStart(2, "0");
-        setEndDate(`${yyyy}-${mm}-${dd}`);
+        if (pkg.duration === 12) {
+          
+          setEndDate(null);
+        } else {
+          
+          const start = new Date(startDate);
+          const end = new Date(start);
+          end.setMonth(end.getMonth() + pkg.duration);
+          const yyyy = end.getFullYear();
+          const mm = String(end.getMonth() + 1).padStart(2, "0");
+          const dd = String(end.getDate()).padStart(2, "0");
+          setEndDate(`${yyyy}-${mm}-${dd}`);
+        }
       }
     }
   }, [startDate, packageId, packages]);
+
+  const fetchOccupiedRooms = async () => {
+    try {
+      const res = await axios.get(`${apiPath}/contracts/occupied-rooms`, {
+        withCredentials: true,
+      });
+      if (Array.isArray(res.data)) {
+        setOccupiedRoomIds(res.data);
+      } else {
+        setOccupiedRoomIds([]);
+      }
+    } catch (err) {
+      console.error("Error fetching occupied rooms:", err);
+      setOccupiedRoomIds([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchOccupiedRooms();   // ✅ refresh ตอน tenant list เปลี่ยน
+  }, [data]);
 
   const handleViewTenant = (item) => {
     navigate(`/tenantdetail/${item.contractId}`);
   };
 
-  const showMessageError = (msg) => alert("❌ Error: " + msg);
-  const showMessageSave = () => alert("✅ Success!");
+  const handleDownloadPdf = async (contractId) => {
+    const res = await axios.get(`${apiPath}/tenant/${contractId}/pdf`, {
+      responseType: "blob",
+      withCredentials: true,
+    });
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `tenant_${contractId}_contract.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
+  const [filters, setFilters] = useState({
+    contractName: "ALL",
+    floor: "ALL",
+    room: "ALL",
+  });
+  
+  const [sortAsc, setSortAsc] = useState(false);  
+  const [search, setSearch] = useState("");
+
+  const filteredData = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let rows = [...data];
+
+    if (filters.contractName !== "ALL") {
+      rows = rows.filter((r) => r.contractName === filters.contractName);
+    }
+    if (filters.floor !== "ALL") {
+      rows = rows.filter((r) => String(r.floor) === String(filters.floor));
+    }
+    if (filters.room !== "ALL") {
+      rows = rows.filter((r) => r.room === filters.room);
+    }
+
+    if (q) {
+      rows = rows.filter(
+        (r) =>
+          r.firstName?.toLowerCase().includes(q) ||
+          r.lastName?.toLowerCase().includes(q) ||
+          r.room?.toLowerCase().includes(q) ||
+          r.email?.toLowerCase().includes(q)
+      );
+    }
+
+    rows.sort((a, b) => {
+    // 1) เรียงให้ active (status != 0) อยู่ก่อน expired (status == 0)
+    if (a.status === 0 && b.status !== 0) return 1;
+    if (a.status !== 0 && b.status === 0) return -1;
+
+    // 2) ถ้า status เท่ากัน → เรียงตาม startDate ตาม sortAsc
+    const dateA = new Date(a.startDate || 0);
+    const dateB = new Date(b.startDate || 0);
+
+    return sortAsc ? dateA - dateB : dateB - dateA;
+  });
+
+    return rows;
+  }, [data, filters, sortAsc, search]);
+  
+  const contractTypeOptions = useMemo(() => {
+    if (!Array.isArray(allPackages)) return [];
+    const map = new Map();
+
+    for (const p of allPackages) {
+      if (p.contract_name && !map.has(p.contract_name)) {
+        map.set(p.contract_name, {
+          id: p.contract_name,   // ใช้ชื่อเป็น id เลย
+          name: p.contract_name,
+          duration: p.duration,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => a.duration - b.duration);
+  }, [allPackages]);
+    
   return (
     <Layout title="Tenant Management" icon="pi pi-user" notifications={3}>
       <div className="container-fluid">
@@ -398,11 +504,19 @@ function TenantManagement() {
                 <div className="tm-toolbar d-flex justify-content-between align-items-center">
                   {/* Left cluster */}
                   <div className="d-flex align-items-center gap-3">
-                    <button className="btn btn-link tm-link p-0">
+                    <button
+                      className="btn btn-link tm-link p-0"
+                      data-bs-toggle="offcanvas"
+                      data-bs-target="#tenantFilterCanvas"
+                    >
                       <i className="bi bi-filter me-1"></i> Filter
                     </button>
-                    <button className="btn btn-link tm-link p-0">
-                      <i className="bi bi-arrow-down-up me-1"></i> Sort
+                    <button
+                      className="btn btn-link tm-link p-0"
+                      onClick={() => setSortAsc((s) => !s)}
+                    >
+                      <i className="bi bi-arrow-down-up me-1"></i>
+                      Sort 
                     </button>
                     <div className="input-group tm-search">
                       <span className="input-group-text bg-white border-end-0">
@@ -412,6 +526,8 @@ function TenantManagement() {
                         type="text"
                         className="form-control border-start-0"
                         placeholder="Search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
                       />
                     </div>
                   </div>
@@ -467,8 +583,8 @@ function TenantManagement() {
                 </thead>
 
                 <tbody>
-                  {data.length > 0 ? (
-                    data.slice(startIndex, endIndex).map((item, idxInPage) => {
+                  {filteredData.length > 0 ? (
+                    filteredData.slice(startIndex, endIndex).map((item, idxInPage) => {
                       const globalIndex = startIndex + idxInPage;
                       const order = globalIndex + 1;
                       const rowKey =
@@ -477,7 +593,9 @@ function TenantManagement() {
                         `${item.firstName}-${item.room}-${globalIndex}`;
 
                       return (
-                        <tr key={rowKey}>
+                        <tr key={rowKey}
+                          className={item.status === 0 ? "table-secondary" : ""} // 👈 ถ้า status=0 แสดงสีเทาอ่อน
+                        >
                           {/* Order */}
                           <td className="align-top text-center">{order}</td>
                           <td className="align-top text-center">
@@ -500,7 +618,7 @@ function TenantManagement() {
                                 backgroundColor: packageColor(
                                   packageLabel(item.packageId)
                                 ),
-                                color: "#fff", // ✅ ตัวหนังสือขาว
+                                color: "#fff",
                               }}
                             >
                               {packageLabel(item.packageId)}
@@ -525,44 +643,46 @@ function TenantManagement() {
                             >
                               <i className="bi bi-eye-fill"></i>
                             </button>
-                            <button
+                           <button
                               className="btn btn-sm form-Button-Edit"
-                              onClick={() => handleEdit(item)}
-                              aria-label="Edit"
+                              onClick={() => handleDownloadPdf(item.contractId)}
                             >
                               <i className="bi bi-file-earmark-pdf-fill"></i>
                             </button>
                             <button
                               className="btn btn-sm form-Button-Del"
-                              onClick={() => {
-                                if (window.confirm("คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้?")) {
+                              onClick={async () => {
+                                const result = await showMessageConfirmDelete(item.firstName);
+                                if (result.isConfirmed) {
                                   handleDelete(item.contractId);
                                 }
                               }}
                               aria-label="Delete"
                             >
-                              <i className="bi bi-trash-fill"></i>
-                            </button>
+                            <i className="bi bi-trash-fill"></i>
+                          </button>
                           </td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td colSpan="10" className="text-center">
-                        Data Not Found
+                      <td colSpan="12" className="text-center align-middle">
+                        <div className="d-flex justify-content-center align-items-center" >
+                          Data Not Found
+                        </div>
                       </td>
                     </tr>
-                  )}
+                  )}  
                 </tbody>
               </table>
             </div>
 
             <Pagination
               currentPage={currentPage}
-              totalPages={totalPages}
+              totalPages={Math.max(1, Math.ceil(filteredData.length / pageSize))}
               onPageChange={handlePageChange}
-              totalRecords={totalRecords}
+              totalRecords={filteredData.length}
               onPageSizeChange={handlePageSizeChange}
             />
           </div>
@@ -580,7 +700,6 @@ function TenantManagement() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            // ผูก Save กับฟังก์ชันเดิม
             handleSaveCreate();
           }}
         >
@@ -616,17 +735,25 @@ function TenantManagement() {
                   className="form-control"
                   placeholder="Tenant National ID"
                   value={nationalId}
-                  onChange={(e) => setNationalId(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, ""); 
+                    if (val.length <= 13) setNationalId(val);
+                  }}
+                  maxLength={13}
                 />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Phone Number</label>
                 <input
-                  type="tel"
+                  type="text"
                   className="form-control"
                   placeholder="Tenant Phone Number"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, ""); 
+                    if (val.length <= 10) setPhoneNumber(val);     
+                  }}
+                  maxLength={10}
                 />
               </div>
               <div className="col-md-6">
@@ -654,7 +781,7 @@ function TenantManagement() {
                     value={selectedFloor}
                     onChange={(e) => {
                       setSelectedFloor(e.target.value);
-                      setSelectedRoomId(""); // reset ห้องเมื่อเปลี่ยนชั้น
+                      setSelectedRoomId("");
                     }}
                   >
                     <option value="">Select Floor</option>
@@ -683,9 +810,8 @@ function TenantManagement() {
                       {selectedFloor ? "Select Room" : "Choose floor first"}
                     </option>
                     {rooms
-                      .filter(
-                        (r) => String(r.roomFloor) === String(selectedFloor)
-                      )
+                      .filter((r) => String(r.roomFloor) === String(selectedFloor))
+                      .filter((r) => !occupiedRoomIds.includes(r.id)) // ✅ ห้องหมดสัญญาจะกลับมาเลือกได้
                       .map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.roomNumber}
@@ -776,20 +902,80 @@ function TenantManagement() {
               type="button"
               className="btn btn-outline-secondary"
               data-bs-dismiss="modal"
-              id="modalForm_btnClose"   // ✅ เพิ่ม id ให้ปุ่ม Cancel
+              id="modalForm_btnClose"
             >
               Cancel
             </button>
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-            >
+            <button type="submit" className="btn btn-primary">
               Save
             </button>
           </div>
         </form>
       </Modal>
+      <div
+        className="offcanvas offcanvas-end"
+        tabIndex="-1"
+        id="tenantFilterCanvas"
+        data-bs-backdrop="static"
+      >
+        <div className="offcanvas-header">
+          <h5 className="mb-0"><i className="bi bi-filter me-2"></i>Filters</h5>
+          <button type="button" className="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div className="offcanvas-body">
+          <div className="mb-3">
+            <label className="form-label">Package</label>
+            <select
+              className="form-select"
+              value={filters.contractName}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, contractName: e.target.value }))
+              }
+            >
+              <option value="ALL">All</option>
+              {contractTypeOptions.map((ct) => (
+                <option key={ct.id} value={ct.id}>
+                  {ct.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Floor</label>
+            <select
+              className="form-select"
+              value={filters.floor}
+              onChange={(e) => setFilters((f) => ({ ...f, floor: e.target.value }))}
+            >
+              <option value="ALL">All</option>
+              {[...new Set(rooms.map((r) => r.roomFloor))].map((floor) => (
+                <option key={floor} value={floor}>{floor}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label">Room</label>
+            <select
+              className="form-select"
+              value={filters.room}
+              onChange={(e) => setFilters((f) => ({ ...f, room: e.target.value }))}
+            >
+              <option value="ALL">All</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.roomNumber}>{r.roomNumber}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="d-flex justify-content-between">
+            <button className="btn btn-outline-secondary" onClick={() => setFilters({ contractName: "ALL", floor: "ALL", room: "ALL" })}>Clear</button>
+            <button className="btn btn-primary" data-bs-dismiss="offcanvas">Apply</button>
+          </div>
+        </div>
+      </div>
     </Layout>
   );
 }

@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 public class PackagePlanService {
 
@@ -64,4 +66,23 @@ public class PackagePlanService {
                 ))
                 .collect(Collectors.toList());
     }
+
+    @Transactional
+    public PackagePlanDto togglePackageStatus(Long packageId) {
+        PackagePlan pkg = packagePlanRepository.findById(packageId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Package not found"));
+
+        Integer current = pkg.getIsActive() != null ? pkg.getIsActive() : 0;
+        pkg.setIsActive(current == 1 ? 0 : 1);
+        PackagePlan saved = packagePlanRepository.save(pkg);
+
+        return new PackagePlanDto(
+                saved.getId(),
+                saved.getPrice(),
+                saved.getIsActive(),
+                saved.getContractType() != null ? saved.getContractType().getName() : null,
+                saved.getContractType() != null ? saved.getContractType().getDuration() : null
+        );
+    }
 }
+
