@@ -1,6 +1,5 @@
 package com.organicnow.backend.repository;
 
-
 import com.organicnow.backend.dto.AssetDto;
 import com.organicnow.backend.model.RoomAsset;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -9,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface RoomAssetRepository extends JpaRepository<RoomAsset, Long> {
+public interface AssetRepository extends JpaRepository<RoomAsset, Long> {
 
     @Query("""
            SELECT new com.organicnow.backend.dto.AssetDto(
@@ -22,4 +21,3 @@ public interface RoomAssetRepository extends JpaRepository<RoomAsset, Long> {
            """)
     List<AssetDto> findAssetsByRoomId(@Param("roomId") Long roomId);
 }
-

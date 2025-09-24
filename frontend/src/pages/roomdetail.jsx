@@ -1,496 +1,382 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../component/layout";
-import Modal from "../component/modal";
+import axios from "axios";
 import "../assets/css/roomdetail.css";
-import "bootstrap/dist/js/bootstrap.bundle.min.js";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "bootstrap-icons/font/bootstrap-icons.css";
 
 function RoomDetail() {
-  const navigate = useNavigate();
-  const location = useLocation();
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [roomData, setRoomData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [form, setForm] = useState({}); // 🟢 state ฟอร์ม
 
-  // รับค่าที่ส่งมาจาก RoomManagement
-  const { room, rid, floor, from, status } = location.state || {};
-  const backPath = from || "/roommanagement";
+    useEffect(() => {
+        const fetchRoomDetail = async () => {
+            try {
+                const res = await axios.get(
+                    `http://localhost:8080/rooms/${id}/detail`,
+                    { withCredentials: true }
+                );
+                setRoomData(res.data);
+                setForm(res.data); // 🟢 preload form
+            } catch (err) {
+                console.error("Error fetching room detail:", err);
+                setError("Failed to fetch room details");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchRoomDetail();
+    }, [id]);
 
-  // ---- Room info (ใช้ในการแสดงผล + แบบฟอร์ม) ----
-  const [roomInfo, setRoomInfo] = useState({
-    room: room ?? "",
-    floor: floor ?? "",
-    status: status ?? "Unavailable",
-  });
+    if (loading) return <p className="text-center mt-5">Loading...</p>;
+    if (error) return <p className="text-center mt-5">{error}</p>;
+    if (!roomData) return <p className="text-center mt-5">No data found</p>;
 
-  // ถ้าไม่มี room ให้ย้อนกลับ
-  useEffect(() => {
-    if (!room) navigate("/roommanagement");
-  }, [room, navigate]);
+    // 🟢 ฟังก์ชันเลือกสีของ Package
+    const getPackageBadgeClass = (contractName) => {
+        if (!contractName) return "bg-secondary";
+        if (contractName.includes("3")) return "bg-warning text-dark";
+        if (contractName.includes("6")) return "bg-pink text-white";
+        if (contractName.includes("9")) return "bg-info text-white";
+        if (contractName.includes("1")) return "bg-primary text-white";
+        return "bg-secondary";
+    };
 
-  // อัปเดตข้อมูลเมื่อ location.state เปลี่ยน (กันกรณีเข้ามาพร้อมค่าใหม่)
-  useEffect(() => {
-    setRoomInfo({
-      room: room ?? "",
-      floor: floor ?? "",
-      status: status ?? "Unavailable",
-    });
-  }, [room, floor, status]);
-
-  // ---- ตาราง Assets (เหมือนเดิม) ----
-  const [data, setData] = useState([{ order: 1, RID: "", assets: "Light", status: "Active" }]);
-  useEffect(() => {
-    if (rid) setData((prev) => prev.map((r) => ({ ...r, RID: rid })));
-  }, [rid]);
-
-  const [selectedItems, setSelectedItems] = useState([]);
-  const handleSelectAll = () => {
-    if (selectedItems.length === data.length) setSelectedItems([]);
-    else setSelectedItems(data.map((_, idx) => idx));
-  };
-  const handleSelectRow = (rowIndex) => {
-    setSelectedItems((prev) =>
-      prev.includes(rowIndex) ? prev.filter((i) => i !== rowIndex) : [...prev, rowIndex]
-    );
-  };
-  const isAllSelected = data.length > 0 && selectedItems.length === data.length;
-
-  const handleDelete = (item) => console.log("Delete: ", item);
-
-  const getStatusColor = (s) => {
-    switch ((s || "").toLowerCase()) {
-      case "complete":
-        return "status-complete";
-      case "in process":
-        return "status-warning";
-      case "failed":
-      case "overdue":
-        return "status-danger";
-      default:
-        return "status-default";
-    }
-  };
-
-  // ---- ฟอร์มแก้ไขห้องในโมดัล (คงฟังก์ชันเดิม) ----
-  const [form, setForm] = useState({ room: "", floor: "", status: "Unavailable" });
-
-  // เปิดโมดัลครั้งแรก ให้โหลดค่าปัจจุบันเข้าฟอร์ม
-  useEffect(() => {
-    setForm({
-      room: roomInfo.room ?? "",
-      floor: roomInfo.floor ?? "",
-      status: roomInfo.status ?? "Unavailable",
-    });
-  }, [roomInfo]);
-
-  const onFormChange = (e) => {
-    const { name, value } = e.target;
-    setForm((s) => ({ ...s, [name]: value }));
-  };
-
-  const closeModal = () => {
-    const el = document.getElementById("editRoomModal");
-    if (window.bootstrap && el) window.bootstrap.Modal.getInstance(el)?.hide();
-  };
-
-  const onSubmit = (e) => {
-    e.preventDefault();
-    // อัปเดตข้อมูลที่แสดงบนหน้า (Room Information card)
-    setRoomInfo((prev) => ({
-      ...prev,
-      room: form.room.trim(),
-      floor: form.floor.trim(),
-      status: form.status, // คงเดิม แม้ไม่ได้แสดงในฟอร์ม
-    }));
-    closeModal();
-  };
-
-  /* ==================== เพิ่มเฉพาะส่วน Asset สำหรับโมดัล ==================== */
-  const assetOptions = [
-    { value: "mesh", label: "Mesh screen" },
-    { value: "light", label: "Light" },
-    { value: "plumbing", label: "Plumbing" },
-    { value: "fridge", label: "Fridge" },
-    { value: "wardrobe", label: "Wardrobe" },
-    { value: "dining_table", label: "Dining table" },
-    { value: "chair", label: "Chair" },
-    { value: "bedside_table", label: "Bedside table" },
-    { value: "air", label: "Air Conditioner" },
-    { value: "fan", label: "Fan" },
-  ];
-
-  // เก็บ Asset ที่เลือกไว้ในโมดัล (คงค่าเดิมอัตโนมัติ)
-  const [selectedAssets, setSelectedAssets] = useState([]);
-
-  // เติมค่าเริ่มต้นของ selectedAssets ให้ “คงค่าเดิม”
-  // 1) ใช้ location.state.assets ถ้ามี
-  // 2) ถ้าไม่มีก็รวมจากตาราง data (รองรับทั้ง string/array)
-  useEffect(() => {
-    const assetsFromState = Array.isArray(location.state?.assets)
-      ? location.state.assets
-      : [];
-
-    const assetsFromTable = Array.from(
-      new Set(
-        (data || [])
-          .map((r) => r.assets)
-          .flatMap((a) =>
-            Array.isArray(a) ? a : (a ? String(a).split(",") : [])
-          )
-          .map((s) => s.trim())
-          .filter(Boolean)
-      )
-    );
-
-    const initial = assetsFromState.length ? assetsFromState : assetsFromTable;
-    setSelectedAssets(initial);
-  }, [location.state, data]);
-
-  const handleAddAsset = (e) => {
-    const val = e.target.value;
-    if (!val) return;
-    const label = assetOptions.find((a) => a.value === val)?.label ?? val;
-    setSelectedAssets((prev) => (prev.includes(label) ? prev : [...prev, label]));
-    e.target.value = "";
-  };
-
-  const handleRemoveAsset = (label) =>
-    setSelectedAssets((prev) => prev.filter((x) => x !== label));
-  /* ======================================================================== */
-
-  return (
-    <Layout title="Room Detail" icon="bi bi-folder" notifications={3}>
-      <div className="container-fluid">
-        <div className="row min-vh-100">
-          {/* Main */}
-          <div className="col-lg-11 p-4">
-            {/* Toolbar Card */}
-            <div className="toolbar-wrapper card border-0 bg-white">
-              <div className="card-header bg-white border-0 rounded-2">
-                <div className="tm-toolbar d-flex justify-content-between align-items-center">
-                  {/* Breadcrumb */}
-                  <div className="d-flex align-items-center gap-2">
-                    <span
-                      className="breadcrumb-link text-primary"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => navigate(backPath)}
-                    >
-                      Room Management
-                    </span>
-                    <span className="text-muted">›</span>
-                    <span className="breadcrumb-current">{roomInfo.room || "-"}</span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="d-flex align-items-center gap-2">
-                    <button className="btn btn-outline-light text-danger border-0">
-                      <i className="bi bi-trash" />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      data-bs-toggle="modal"
-                      data-bs-target="#editRoomModal"
-                    >
-                      <i className="bi bi-pencil me-1" /> Edit Room
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="table-wrapper-detail rounded-0">
-              <div className="row g-4">
-                {/* Room Info */}
-                <div className="col-lg-4">
-                  <div className="card border-0 shadow-sm rounded-2">
-                    <div className="card-body">
-                      <h5 className="card-title">Room Information</h5>
-
-                      <p>
-                        <span className="label">Floor:</span>
-                        <span className="value">{roomInfo.floor || "-"}</span>
-                      </p>
-                      <p>
-                        <span className="label">Room:</span>
-                        <span className="value">{roomInfo.room || "-"}</span>
-                      </p>
-                      <p>
-                        <span className="label">Status:</span>
-                        <span
-                          className={`value fw-bold ${
-                            roomInfo.status === "Available" ? "text-success" : "text-danger"
-                          }`}
-                        >
-                          {roomInfo.status || "-"}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="card border-0 shadow-sm mt-3 rounded-2">
-                    <div className="card-body">
-                      <h5 className="card-title">Current Tenant</h5>
-                      <p>
-                        <span className="label">First Name:</span>
-                        <span className="value">John</span>
-                      </p>
-                      <p>
-                        <span className="label">Last Name:</span>
-                        <span className="value">Doe</span>
-                      </p>
-                      <p>
-                        <span className="label">Phone Number:</span>
-                        <span className="value">012-345-6789</span>
-                      </p>
-                      <p>
-                        <span className="label">Package:</span>
-                        <span className="value">
-                          <span className="package-badge badge bg-primary">1 Year</span>
-                        </span>
-                      </p>
-                      <p>
-                        <span className="label">Sign Date:</span>
-                        <span className="value">2024-12-31</span>
-                      </p>
-                      <p>
-                        <span className="label">Start Date:</span>
-                        <span className="value">2024-12-31</span>
-                      </p>
-                      <p>
-                        <span className="label">End Date:</span>
-                        <span className="value">2025-12-31</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Assets & Requests */}
-                <div className="col-lg-8 d-flex flex-column">
-                  <div className="card border-0 shadow-sm flex-grow-1 rounded-2" style={{ overflowY: "auto", paddingRight: "8px" }}>
-                    <div className="card-body d-flex flex-column overflow-hidden">
-                      {/* Tabs */}
-                      <ul className="nav nav-tabs bg-white" id="historyTabs" role="tablist">
-                        <li className="nav-item" role="presentation">
-                          <button className="nav-link active" id="payment-tab" data-bs-toggle="tab" data-bs-target="#payment" type="button" role="tab">
-                            Assets
-                          </button>
-                        </li>
-                        <li className="nav-item" role="presentation">
-                          <button className="nav-link" id="request-tab" data-bs-toggle="tab" data-bs-target="#request" type="button" role="tab">
-                            Request History
-                          </button>
-                        </li>
-                      </ul>
-
-                      {/* Content */}
-                      <div className="tab-content mt-3 overflow-auto flex-grow-1" style={{ maxHeight: "500px" }}>
-                        {/* Assets */}
-                        <div className="tab-pane fade show active rounded-2" id="payment" role="tabpanel">
-                          <table className="table text-nowrap">
-                            <thead>
-                              <tr>
-                                {/*<th className="text-center header-color checkbox-cell">*/}
-                                {/*  <input*/}
-                                {/*    type="checkbox"*/}
-                                {/*    checked={isAllSelected}*/}
-                                {/*    onChange={handleSelectAll}*/}
-                                {/*    aria-label="Select all rows"*/}
-                                {/*  />*/}
-                                {/*</th>*/}
-                                <th className="text-center align-middle header-color">Order</th>
-                                <th className="text-center align-middle header-color">RID</th>
-                                <th className="text-center align-middle header-color">Assets</th>
-                                <th className="text-center align-middle header-color">Status</th>
-                                  <th className="text-center align-middle header-color">Action</th>
-                                {/*<th className="text-center align-middle header-color">*/}
-                                {/*  <div className="btn-container">*/}
-                                {/*    <button type="button" className="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editRoomModal">*/}
-                                {/*      <i className="bi bi-pencil me-1" /> Add*/}
-                                {/*    </button>*/}
-                                {/*  </div>*/}
-                                {/*</th>*/}
-                              </tr>
-                            </thead>
-
-                            <tbody>
-                              {data.length > 0 ? (
-                                data.map((item, idx) => (
-                                  <tr key={idx}>
-                                    {/*<td className="align-middle text-center checkbox-cell">*/}
-                                    {/*  <input*/}
-                                    {/*    type="checkbox"*/}
-                                    {/*    checked={selectedItems.includes(idx)}*/}
-                                    {/*    onChange={() => handleSelectRow(idx)}*/}
-                                    {/*    aria-label={`Select row ${idx + 1}`}*/}
-                                    {/*  />*/}
-                                    {/*</td>*/}
-
-                                    <td className="align-middle text-center">{item.order}</td>
-                                    <td className="align-middle text-center">{item.RID || rid || "-"}</td>
-                                    <td className="align-middle text-center">{item.assets}</td>
-                                    <td className="align-middle text-center">{item.status}</td>
-                                    <td className="align-middle text-center">
-                                      <button
-                                        className="btn btn-sm form-Button-Del me-1"
-                                        onClick={() => handleDelete(item)}
-                                        aria-label="Delete row"
-                                      >
-                                        <i className="bi bi-trash-fill" />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                ))
-                              ) : (
-                                <tr>
-                                  <td colSpan="11" className="text-center">Data Not Found</td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Request History */}
-                        <div className="tab-pane fade" id="request" role="tabpanel">
-                          <div className="row row-cols-1 row-cols-md-2 g-3">
-                            {[
-                              { date: "2025-04-30", id: "iv0001250430", net: "4,438 Baht", status: "In process", pay: "2025-04-16", penalty: "-" },
-                              { date: "2025-03-31", id: "iv0001250331", net: "4,438 Baht", status: "Complete",  pay: "2025-04-16", penalty: "1,000 Baht" },
-                            ].map((inv, idx) => (
-                              <div className="col-lg-12" key={idx}>
-                                <div className={`status-card ${getStatusColor(inv.status)} d-flex flex-column`}>
-                                  <div className="row mb-1">
-                                    <div className="col-4">
-                                      <span className="label">Invoice date: </span>
-                                      <span className="value">{inv.date}</span>
-                                    </div>
-                                    <div className="col-4">
-                                      <span className="label">Invoice ID: </span>
-                                      <span className="value">{inv.id}</span>
-                                    </div>
-                                    <div className="col-4">
-                                      <span className="label">NET: </span>
-                                      <span className="value">{inv.net}</span>
-                                    </div>
-                                  </div>
-                                  <div className="row">
-                                    <div className="col-4">
-                                      <span className="label">Status: </span>
-                                      <span className="value">{inv.status}</span>
-                                    </div>
-                                    <div className="col-4">
-                                      <span className="label">Pay date:</span>
-                                      <span className="value">{inv.pay}</span>
-                                    </div>
-                                    <div className="col-4">
-                                      <span className="label">Penalty: </span>
-                                      <span className="value">{inv.penalty}</span>
-                                    </div>
-                                  </div>
+    return (
+        <Layout title="Room Detail" icon="bi bi-folder" notifications={3}>
+            <div className="container-fluid">
+                <div className="row min-vh-100">
+                    <div className="col-lg-11 p-4 mx-auto">
+                        {/* ===== Top Toolbar ===== */}
+                        <div className="card border-0 shadow-sm bg-white rounded-3 mb-4">
+                            <div className="card-body d-flex justify-content-between align-items-center">
+                                {/* Breadcrumb */}
+                                <div className="d-flex align-items-center gap-2">
+                                    <span
+                                        className="breadcrumb-link text-primary"
+                                        style={{ cursor: "pointer" }}
+                                        onClick={() => navigate("/roommanagement")}
+                                    >
+                                        Room Management
+                                    </span>
+                                    <span className="text-muted">›</span>
+                                    <span className="breadcrumb-current">
+                                        {roomData.roomNumber}
+                                    </span>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
+
+                                {/* Actions */}
+                                <div className="d-flex align-items-center gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#editRoomModal"
+                                    >
+                                        <i className="bi bi-pencil me-1" /> Edit Room
+                                    </button>
+                                </div>
+
+                            </div>
                         </div>
-                      </div>
-                      {/* /Content */}
+
+                        {/* ===== Content Row ===== */}
+                        <div className="row g-4">
+                            {/* Left Column: Room Info + Tenant */}
+                            <div className="col-lg-4 d-flex">
+                                <div className="card border-0 shadow-sm rounded-3 flex-fill">
+                                    <div className="card-body">
+                                        <h5 className="card-title">Room Information</h5>
+                                        <p>
+                                            <strong>Floor:</strong> {roomData.roomFloor}
+                                        </p>
+                                        <p>
+                                            <strong>Room:</strong> {roomData.roomNumber}
+                                        </p>
+                                        <p>
+                                            <strong>Status:</strong>{" "}
+                                            <span
+                                                className={`badge rounded-pill px-3 py-2 ${
+                                                    roomData.status === "occupied"
+                                                        ? "bg-danger"
+                                                        : "bg-success"
+                                                }`}
+                                            >
+                                                {roomData.status === "occupied"
+                                                    ? "Unavailable"
+                                                    : "Available"}
+                                            </span>
+                                        </p>
+
+                                        <hr />
+                                        <h5 className="card-title">Current Tenant</h5>
+                                        <p>
+                                            <strong>First Name:</strong> {roomData.firstName}
+                                        </p>
+                                        <p>
+                                            <strong>Last Name:</strong> {roomData.lastName}
+                                        </p>
+                                        <p>
+                                            <strong>Phone Number:</strong> {roomData.phoneNumber}
+                                        </p>
+                                        <p>
+                                            <strong>Email:</strong> {roomData.email}
+                                        </p>
+                                        <p>
+                                            <strong>Package:</strong>{" "}
+                                            <span
+                                                className={`badge rounded-pill px-3 py-2 ${getPackageBadgeClass(
+                                                    roomData.contractName
+                                                )}`}
+                                            >
+                                                {roomData.contractName}
+                                            </span>
+                                        </p>
+                                        <p>
+                                            <strong>Sign Date:</strong>{" "}
+                                            {roomData.signDate?.split("T")[0]}
+                                        </p>
+                                        <p>
+                                            <strong>Start Date:</strong>{" "}
+                                            {roomData.startDate?.split("T")[0]}
+                                        </p>
+                                        <p>
+                                            <strong>End Date:</strong>{" "}
+                                            {roomData.endDate?.split("T")[0]}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Assets + Requests */}
+                            <div className="col-lg-8 d-flex">
+                                <div className="card border-0 shadow-sm rounded-3 flex-fill">
+                                    <div className="card-body">
+                                        {/* Tabs */}
+                                        <ul className="nav nav-tabs" id="detailTabs" role="tablist">
+                                            <li className="nav-item" role="presentation">
+                                                <button
+                                                    className="nav-link active"
+                                                    id="assets-tab"
+                                                    data-bs-toggle="tab"
+                                                    data-bs-target="#assets"
+                                                    type="button"
+                                                    role="tab"
+                                                >
+                                                    Assets
+                                                </button>
+                                            </li>
+                                            <li className="nav-item" role="presentation">
+                                                <button
+                                                    className="nav-link"
+                                                    id="requests-tab"
+                                                    data-bs-toggle="tab"
+                                                    data-bs-target="#requests"
+                                                    type="button"
+                                                    role="tab"
+                                                >
+                                                    Request History
+                                                </button>
+                                            </li>
+                                        </ul>
+
+                                        {/* Tab Content */}
+                                        <div className="tab-content mt-3">
+                                            {/* Assets */}
+                                            <div
+                                                className="tab-pane fade show active"
+                                                id="assets"
+                                                role="tabpanel"
+                                            >
+                                                {roomData.assets?.length > 0 ? (
+                                                    <table className="table text-nowrap">
+                                                        <thead>
+                                                        <tr>
+                                                            <th>RID</th>
+                                                            <th>Asset</th>
+                                                            <th>Status</th>
+                                                        </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                        {roomData.assets.map((a, i) => (
+                                                            <tr key={i}>
+                                                                <td>R{i + 1}</td>
+                                                                <td>{a.assetName}</td>
+                                                                <td>{a.assetType}</td>
+                                                            </tr>
+                                                        ))}
+                                                        </tbody>
+                                                    </table>
+                                                ) : (
+                                                    <p className="text-muted">No assets found</p>
+                                                )}
+                                            </div>
+
+                                            {/* Requests */}
+                                            <div
+                                                className="tab-pane fade"
+                                                id="requests"
+                                                role="tabpanel"
+                                            >
+                                                {roomData.requests?.length > 0 ? (
+                                                    <table className="table text-nowrap">
+                                                        <thead>
+                                                        <tr>
+                                                            <th>ID</th>
+                                                            <th>Issue</th>
+                                                            <th>Scheduled</th>
+                                                            <th>Finished</th>
+                                                        </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                        {roomData.requests.map((r) => (
+                                                            <tr key={r.id}>
+                                                                <td>{r.id}</td>
+                                                                <td>{r.issueTitle}</td>
+                                                                <td>
+                                                                    {r.scheduledDate?.replace("T", " ") || "-"}
+                                                                </td>
+                                                                <td>
+                                                                    {r.finishDate?.replace("T", " ") || "-"}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                        </tbody>
+                                                    </table>
+                                                ) : (
+                                                    <p className="text-muted">No requests found</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                  </div>
                 </div>
-                {/* /Assets & Requests */}
-              </div>
-            </div>
-          </div>
-          {/* /Main */}
-        </div>
-      </div>
-
-      {/* ==== Modal: Edit Room (เอา Status ออก + เลือก Asset และคงค่าเดิม) ==== */}
-      <Modal
-        id="editRoomModal"
-        title="Edit Room"
-        icon="bi bi-pencil-square"
-        size="modal-lg"
-        scrollable="modal-dialog-scrollable"
-      >
-        <form onSubmit={onSubmit}>
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label">Floor</label>
-              <input
-                type="text"
-                name="floor"
-                className="form-control"
-                value={form.floor}
-                onChange={onFormChange}
-                placeholder="e.g. 1"
-              />
             </div>
 
-            <div className="col-md-4">
-              <label className="form-label">Room</label>
-              <input
-                type="text"
-                name="room"
-                className="form-control"
-                value={form.room}
-                onChange={onFormChange}
-                placeholder="e.g. 101"
-              />
+            {/* ==== Modal: Edit Room ==== */}
+            <div
+                className="modal fade"
+                id="editRoomModal"
+                tabIndex="-1"
+                aria-labelledby="editRoomModalLabel"
+                aria-hidden="true"
+            >
+                <div className="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h5 className="modal-title" id="editRoomModalLabel">
+                                <i className="bi bi-pencil-square me-2"></i>Edit Room
+                            </h5>
+                            <button
+                                type="button"
+                                className="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"
+                            ></button>
+                        </div>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                setRoomData((prev) => ({
+                                    ...prev,
+                                    ...form,
+                                }));
+                                const el = document.getElementById("editRoomModal");
+                                if (window.bootstrap && el)
+                                    window.bootstrap.Modal.getInstance(el)?.hide();
+                            }}
+                        >
+                            <div className="modal-body">
+                                <div className="row g-3">
+                                    <div className="col-md-4">
+                                        <label className="form-label">Floor</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            defaultValue={roomData.roomFloor}
+                                            onChange={(e) =>
+                                                setForm((s) => ({ ...s, roomFloor: e.target.value }))
+                                            }
+                                        />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label">Room</label>
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            defaultValue={roomData.roomNumber}
+                                            onChange={(e) =>
+                                                setForm((s) => ({ ...s, roomNumber: e.target.value }))
+                                            }
+                                        />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label">Status</label>
+                                        <select
+                                            className="form-select"
+                                            defaultValue={roomData.status}
+                                            onChange={(e) =>
+                                                setForm((s) => ({ ...s, status: e.target.value }))
+                                            }
+                                        >
+                                            <option value="available">Available</option>
+                                            <option value="occupied">Occupied</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Asset Section */}
+                                    <div className="col-md-12">
+                                        <label className="form-label">Asset</label>
+                                        <div className="d-flex flex-wrap gap-2">
+                                            {["Mesh screen", "Light", "Plumbing", "Fridge", "Wardrobe", "Dining table", "Chair", "Bedside table"].map((asset) => (
+                                                <div className="form-check" key={asset}>
+                                                    <input
+                                                        className="form-check-input"
+                                                        type="checkbox"
+                                                        id={asset}
+                                                        checked={form.assets?.includes(asset)}
+                                                        onChange={(e) => {
+                                                            setForm((prev) => {
+                                                                const newAssets = e.target.checked
+                                                                    ? [...(prev.assets || []), asset]
+                                                                    : prev.assets?.filter((a) => a !== asset);
+                                                                return { ...prev, assets: newAssets };
+                                                            });
+                                                        }}
+                                                    />
+                                                    <label className="form-check-label" htmlFor={asset}>
+                                                        {asset}
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    data-bs-dismiss="modal"
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
-
-            {/* Asset selector */}
-            <div className="col-md-4">
-              <label className="form-label">Asset</label>
-              <select className="form-select" onChange={handleAddAsset} defaultValue="">
-                <option value="">Select Asset</option>
-                {assetOptions.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Chips แสดง Asset เดิม + ที่เลือกเพิ่ม */}
-            <div className="col-12">
-              <div className="d-flex flex-wrap gap-2">
-                {selectedAssets.length > 0 ? (
-                  selectedAssets.map((a) => (
-                    <span
-                      key={a}
-                      className="badge rounded-pill border border-primary text-primary px-3 py-2"
-                    >
-                      {a}
-                      <button
-                        type="button"
-                        className="btn-close btn-close-sm ms-2"
-                        aria-label="Remove"
-                        onClick={() => handleRemoveAsset(a)}
-                        style={{ fontSize: "0.6rem" }}
-                      />
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-muted">No assets selected</span>
-                )}
-              </div>
-            </div>
-
-            {/* คงฟังก์ชันเดิม: ไม่แสดง status ในฟอร์ม แต่ state form.status ยังอยู่ */}
-          </div>
-
-          <div className="d-flex justify-content-end gap-2 mt-4">
-            <button type="button" className="btn btn-secondary" onClick={closeModal}>
-              Cancel
-            </button>
-            <button type="submit" className="btn btn-primary">
-              Save
-            </button>
-          </div>
-        </form>
-      </Modal>
-    </Layout>
-  );
+        </Layout>
+    );
 }
 
 export default RoomDetail;

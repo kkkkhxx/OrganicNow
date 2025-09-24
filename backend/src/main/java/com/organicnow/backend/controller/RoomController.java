@@ -1,58 +1,25 @@
 package com.organicnow.backend.controller;
 
-import com.organicnow.backend.model.Room;
+import com.organicnow.backend.dto.RoomDetailDto;
 import com.organicnow.backend.service.RoomService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/rooms")
+@RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true") // อนุญาต frontend
 public class RoomController {
 
-
     private final RoomService roomService;
 
-    public RoomController(RoomService roomService) {
-        this.roomService = roomService;
-    }
-
-    // ✅ GET All Rooms
-    @GetMapping
-    public Map<String, Object> getAllRooms() {
-        List<Room> rooms = roomService.getAllRooms();
-        Map<String, Object> response = new HashMap<>();
-        response.put("result", rooms);
-        return response;
-    }
-
-    // ✅ GET Room by ID
-    @GetMapping("/{id}")
-    public Map<String, Object> getRoomById(@PathVariable Long id) {
-        Room room = roomService.getRoomById(id);
-        Map<String, Object> response = new HashMap<>();
-        response.put("result", room);
-        return response;
-    }
-
-    // ✅ POST Create Room
-    @PostMapping
-    public Map<String, Object> createRoom(@RequestBody Room room) {
-        Room savedRoom = roomService.saveRoom(room);
-        Map<String, Object> response = new HashMap<>();
-        response.put("result", savedRoom);
-        return response;
-    }
-
-    // ✅ DELETE Room
-    @DeleteMapping("/{id}")
-    public Map<String, Object> deleteRoom(@PathVariable Long id) {
-        roomService.deleteRoom(id);
-        Map<String, Object> response = new HashMap<>();
-        response.put("result", "Room with ID " + id + " deleted successfully");
-        return response;
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<?> getRoomDetail(@PathVariable Long id) {
+        RoomDetailDto dto = roomService.getRoomDetail(id);
+        if (dto == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(dto);
     }
 }

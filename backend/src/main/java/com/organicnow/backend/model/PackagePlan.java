@@ -27,4 +27,3 @@ public class PackagePlan {
     @Column(name = "is_active", nullable = false)
     private Integer isActive;   // 0 = ไม่ใช้งาน, 1 = ใช้งาน
 }
-
