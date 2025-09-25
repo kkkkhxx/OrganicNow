@@ -3,7 +3,7 @@ package com.organicnow.backend.dto;
 public class AssetDto {
     private Long assetId;
     private String assetName;
-    private String assetType;
+    private String assetType; // เพิ่ม assetType
 
     public AssetDto() {}
 

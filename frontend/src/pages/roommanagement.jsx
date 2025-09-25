@@ -17,21 +17,21 @@ function RoomManagement() {
     const [totalRecords, setTotalRecords] = useState(0);
     const [pageSize, setPageSize] = useState(defaultPageSize);
     const [data, setData] = useState([]);
+    const [error, setError] = useState(""); // เพิ่ม state สำหรับจัดการ error
 
     // โหลดข้อมูลห้องจาก backend
     const fetchRooms = async () => {
         try {
             const res = await axios.get(`${apiPath}/rooms`, { withCredentials: true });
-            console.log("Fetched Rooms:", res.data);
-
-            // ✅ จัดเรียงห้องจากน้อยไปมาก
-            const sortedData = [...res.data].sort((a, b) => {
-                return parseInt(a.roomNumber, 10) - parseInt(b.roomNumber, 10);
-            });
-
-            setData(sortedData || []);
+            if (Array.isArray(res.data)) {
+                const sortedData = [...res.data].sort((a, b) => parseInt(a.roomNumber, 10) - parseInt(b.roomNumber, 10));
+                setData(sortedData);  // ตั้งค่าข้อมูลห้องที่ดึงมา
+            } else {
+                setError("ข้อมูลที่ได้มาไม่ถูกต้อง");
+            }
         } catch (err) {
             console.error("Error fetching rooms:", err);
+            setError("เกิดข้อผิดพลาดในการดึงข้อมูลห้อง");
         }
     };
 
@@ -39,7 +39,6 @@ function RoomManagement() {
         fetchRooms();
     }, []);
 
-    // pagination
     useEffect(() => {
         const total = data.length;
         const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -54,6 +53,7 @@ function RoomManagement() {
     const handlePageChange = (page) => {
         if (page >= 1 && page <= totalPages) setCurrentPage(page);
     };
+
     const handlePageSizeChange = (size) => {
         setPageSize(size);
         setCurrentPage(1);
@@ -61,20 +61,44 @@ function RoomManagement() {
 
     const StatusPill = ({ status }) => (
         <span
-            className={`badge rounded-pill ${
-                status === "occupied" ? "bg-danger" : "bg-success"
-            }`}
+            className={`badge rounded-pill ${status === "repair" ? "bg-warning" : status === "occupied" ? "bg-danger" : "bg-success"}`}
         >
-      {status === "occupied" ? "Unavailable" : "Available"}
-    </span>
+            {status === "repair" ? "Repair" : status === "occupied" ? "Unavailable" : "Available"}
+        </span>
     );
+
+    // ฟังก์ชันตรวจสอบว่ามี request ที่ยังไม่เสร็จหรือไม่
+    const hasPendingRequests = (requests) => {
+        if (!requests || !Array.isArray(requests)) {
+            return false;
+        }
+        return requests.some(request => !request.finishDate);
+    };
+
+    // ฟังก์ชันแสดงสถานะ Pending Requests
+    const getPendingRequestIndicator = (requests) => {
+        if (hasPendingRequests(requests)) {
+            return <span className="pending-request-indicator">●</span>; // จุดสีแดง
+        } else {
+            return <span className="no-pending-request-indicator">●</span>; // จุดสีเทา
+        }
+    };
+
+    // ฟังก์ชันกำหนดสถานะห้อง
+    const getRoomStatus = (status, requests) => {
+        // ถ้าสถานะเป็น available และมี request ที่ยังไม่เสร็จ ให้เปลี่ยนเป็น repair
+        if (status === "available" && hasPendingRequests(requests)) {
+            return "repair";
+        }
+        return status; // คืนค่าสถานะเดิม
+    };
 
     return (
         <Layout title="Room Management" icon="bi bi-building" notifications={3}>
             <div className="container-fluid">
                 <div className="row min-vh-100">
                     <div className="col-lg-11 p-4">
-                        {/* Table */}
+                        {error && <p className="text-danger">{error}</p>} {/* แสดง error ถ้ามี */}
                         <div className="table-wrapper">
                             <table className="table text-nowrap align-middle tm-left">
                                 <thead className="header-color">
@@ -83,7 +107,7 @@ function RoomManagement() {
                                     <th>Room</th>
                                     <th>Floor</th>
                                     <th>Status</th>
-                                    <th>Tenant</th>
+                                    <th>Pending Requests</th>
                                     <th>Action</th>
                                 </tr>
                                 </thead>
@@ -91,18 +115,17 @@ function RoomManagement() {
                                 {pagedData.length > 0 ? (
                                     pagedData.map((item, idx) => {
                                         const order = startIdx + idx + 1;
+                                        const roomStatus = getRoomStatus(item.status, item.requests);
                                         return (
                                             <tr key={item.roomId}>
                                                 <td>{order}</td>
                                                 <td>{item.roomNumber}</td>
                                                 <td>{item.roomFloor}</td>
                                                 <td>
-                                                    <StatusPill status={item.status} />
+                                                    <StatusPill status={roomStatus} />
                                                 </td>
-                                                <td>
-                                                    {item.firstName && item.lastName
-                                                        ? `${item.firstName} ${item.lastName}`
-                                                        : "-"}
+                                                <td className="text-center">
+                                                    {getPendingRequestIndicator(item.requests)}
                                                 </td>
                                                 <td>
                                                     <button

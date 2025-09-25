@@ -20,4 +20,14 @@ public interface AssetRepository extends JpaRepository<RoomAsset, Long> {
            WHERE ra.room.id = :roomId
            """)
     List<AssetDto> findAssetsByRoomId(@Param("roomId") Long roomId);
+
+
+    @Query("""
+           SELECT new com.organicnow.backend.dto.AssetDto(
+               a.id, a.assetName, ag.assetGroupName
+           )
+           FROM Asset a
+           JOIN a.assetGroup ag
+           """)
+    List<AssetDto> findAllAssetOptions();
 }

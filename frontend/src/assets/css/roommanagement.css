@@ -220,5 +220,35 @@
   min-width: 120px; /* Ensure columns have equal width */
   vertical-align: middle;
 }
+/* จัดสไตล์จุดสีแดง */
+/* จัดสไตล์จุดสีแดง */
+.text-danger {
+    color: red;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+/* จัดสไตล์จุดสีเทา */
+.text-muted {
+    color: gray;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+/* สถานะห้อง repair */
+.bg-warning {
+    background-color: #f0ad4e !important;
+}
+.pending-request-indicator {
+    color: #dc3545 !important; /* สีแดง Bootstrap */
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.no-pending-request-indicator {
+    color: #6c757d !important; /* สีเทา Bootstrap */
+    font-size: 20px;
+}
+
 
 
