@@ -61,3 +61,32 @@ INSERT INTO invoice (contract_id, create_date, due_date, invoice_status, pay_dat
                                                                                                                                                                          (3, '2025-03-01', '2025-03-05', 1, '2025-03-15', 1, 21000, 500, 21500, '2025-03-10'),
                                                                                                                                                                          (3, '2025-04-01', '2025-04-05', 0, NULL, NULL,  21000, 0, 21000, NULL)
     ON CONFLICT (invoice_id) DO NOTHING;
+
+-- Sync sequence ของคอลัมน์ invoice.invoice_id ให้ตรงกับข้อมูลล่าสุด
+SELECT setval(
+  pg_get_serial_sequence('public.invoice','invoice_id'),
+  COALESCE((SELECT MAX(invoice_id) FROM public.invoice), 0) + 1,
+  false
+);
+
+
+-- ========== Maintain (seed) ==========
+INSERT INTO maintain
+(maintain_id, target_type, room_id, room_asset_id, issue_category, issue_title, issue_description, create_date, scheduled_date, finish_date)
+VALUES
+  -- 1) Room 101, Target: Asset(0), Issue: Electric(1), ยังไม่เสร็จ
+  (1, 0, 1, NULL, 1, 'Air conditioner - Fix', 'แอร์ไม่เย็น มีเสียงดัง', '2025-03-11 00:00:00', '2025-03-14 09:00:00', NULL),
+
+  -- 2) Room 102, Target: Building(1), Issue: Structure(0), เสร็จแล้ว
+  (2, 1, 2, NULL, 0, 'Wall - Fix', 'ผนังร้าวเล็กน้อย', '2025-02-28 00:00:00', '2025-02-28 10:00:00', '2025-02-28 16:00:00'),
+
+  -- 3) Room 203, Target: Asset(0), Issue: Electric(1), เสร็จแล้ว (Shift)
+  (3, 0, 15, NULL, 1, 'Light - Shift', 'ย้ายตำแหน่งโคมไฟ', '2025-02-28 00:00:00', '2025-02-28 13:00:00', '2025-02-28 15:00:00')
+ON CONFLICT (maintain_id) DO NOTHING;
+
+-- Sync sequence ของ maintain.maintain_id ให้ไปต่อจาก row ล่าสุด
+SELECT setval(
+  pg_get_serial_sequence('public.maintain','maintain_id'),
+  COALESCE((SELECT MAX(maintain_id) FROM public.maintain), 0) + 1,
+  false
+);

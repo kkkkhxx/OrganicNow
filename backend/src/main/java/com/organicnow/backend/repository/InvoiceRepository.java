@@ -15,7 +15,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     // ✅ ของเพื่อน: ดึง invoice ตาม contract
     List<Invoice> findByContact_Id(Long contractId);
-
+    
     /**
      * ✅ Dashboard: สรุปการเงินย้อนหลัง 12 เดือน
      *   - onTime  = จ่ายตรงเวลา (invoice_status = 1 และ penalty_total = 0)

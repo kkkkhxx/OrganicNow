@@ -1,14 +1,25 @@
-// src/pages/MaintenanceRequest.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
 import Pagination from "../component/pagination";
 import { pageSize as defaultPageSize } from "../config_variable";
-import "../assets/css/maintenancerequest.css";
-import "bootstrap/dist/js/bootstrap.bundle.min.js";
+import * as bootstrap from "bootstrap"; // <-- ใช้ตัวนี้สำหรับควบคุมโมดัลแบบโปรแกรม
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
+
+const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080";
+
+// ===== map helpers =====
+const ISSUE_MAP = {
+  air: { cat: 3, label: "Air conditioner" }, // เครื่องใช้/เฟอร์นิเจอร์
+  light: { cat: 1, label: "Light" },         // ไฟฟ้า
+  wall: { cat: 0, label: "Wall" },           // โครงสร้าง
+  plumbing: { cat: 2, label: "Plumbing" },   // ประปา
+};
+
+// yyyy-mm-dd -> yyyy-mm-ddTHH:MM:SS
+const d2ldt = (d) => (d ? `${d}T00:00:00` : null);
 
 function MaintenanceRequest() {
   const navigate = useNavigate();
@@ -18,84 +29,62 @@ function MaintenanceRequest() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const [pageSize, setPageSize] = useState(defaultPageSize || 12);
 
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
   const handlePageSizeChange = (size) => {
-    setPageSize(size);
+    const n = Number(size) || 12;
+    setPageSize(n);
     setCurrentPage(1);
   };
 
-  // ---------------- Mock options ----------------
-  const floorOptions = [
-    { value: "1", label: "Floor 1" },
-    { value: "2", label: "Floor 2" },
-  ];
-  const allRooms = [
-    { value: "101", label: "Room 101", floor: "1" },
-    { value: "102", label: "Room 102", floor: "1" },
-    { value: "110", label: "Room 110", floor: "1" },
-    { value: "201", label: "Room 201", floor: "2" },
-    { value: "202", label: "Room 202", floor: "2" },
-    { value: "203", label: "Room 203", floor: "2" },
-  ];
-  const targetOptions = [
-    { value: "asset", label: "Asset" },
-    { value: "building", label: "Building" },
-  ];
-  const issueOptions = [
-    { value: "air", label: "Air conditioner" },
-    { value: "light", label: "Light" },
-    { value: "wall", label: "Wall" },
-    { value: "plumbing", label: "Plumbing" },
-  ];
-  const maintainTypeOptions = [
-    { value: "fix", label: "Fix" },
-    { value: "shift", label: "Shift" },
-    { value: "clean", label: "Clean" },
-  ];
+  // ---------------- Table data ----------------
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
-  // ---------------- Table data (mock) ----------------
-  const [rows, setRows] = useState([
-    {
-      id: 1,
-      room: "101",
-      floor: "1",
-      target: "Asset",
-      issue: "Air conditioner",
-      maintainType: "Fix",
-      requestDate: "2025-03-11",
-      maintainDate: "2025-03-14",
-      completeDate: "-",
-      state: "Not Started",
-    },
-    {
-      id: 2,
-      room: "102",
-      floor: "1",
-      target: "Building",
-      issue: "Wall",
-      maintainType: "Fix",
-      requestDate: "2025-02-28",
-      maintainDate: "2025-02-28",
-      completeDate: "2025-02-28",
-      state: "Complete",
-    },
-    {
-      id: 3,
-      room: "203",
-      floor: "2",
-      target: "Asset",
-      issue: "Light",
-      maintainType: "Shift",
-      requestDate: "2025-02-28",
-      maintainDate: "2025-02-28",
-      completeDate: "2025-02-28",
-      state: "Complete",
-    },
-  ]);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setErr("");
+      const res = await fetch(`${API_BASE}/maintain/list`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json(); // List<MaintainDto>
+
+      const mapped = (json || []).map((m) => ({
+        id: m.id,
+        room: m.roomNumber ?? "-",
+        floor: (m.roomFloor ?? "").toString(),
+        target: m.targetType === 0 ? "Asset" : "Building",
+        issue: m.issueTitle ?? "-",
+        maintainType: "-", // (UI-only) ไม่มีใน schema
+        requestDate: (m.createDate || "").slice(0, 10),
+        maintainDate: m.scheduledDate ? m.scheduledDate.slice(0, 10) : "-",
+        completeDate: m.finishDate ? m.finishDate.slice(0, 10) : "-",
+        state: m.finishDate ? "Complete" : "Not Started",
+      }));
+
+      setRows(mapped);
+      setTotalRecords(mapped.length);
+      setTotalPages(Math.max(1, Math.ceil(mapped.length / pageSize)));
+      setCurrentPage(1);
+    } catch (e) {
+      console.error(e);
+      setErr("Failed to load maintenance list.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ------------- Toolbar: selection + search -------------
   const [selected, setSelected] = useState([]);
@@ -112,14 +101,16 @@ function MaintenanceRequest() {
         r.floor.toLowerCase().includes(kw) ||
         r.issue.toLowerCase().includes(kw) ||
         r.target.toLowerCase().includes(kw) ||
-        r.maintainType.toLowerCase().includes(kw) ||
         r.state.toLowerCase().includes(kw)
       );
     });
     setTotalRecords(list.length);
-    setTotalPages(1); // mock
+    setTotalPages(Math.max(1, Math.ceil(list.length / pageSize)));
     return list;
-  }, [rows, search]);
+  }, [rows, search, pageSize]);
+
+  const pageStart = (currentPage - 1) * pageSize;
+  const pageRows = filteredRows.slice(pageStart, pageStart + pageSize);
 
   const toggleRow = (id) =>
     setSelected((prev) =>
@@ -128,30 +119,37 @@ function MaintenanceRequest() {
   const toggleAll = () =>
     setSelected((prev) => (prev.length === rows.length ? [] : rows.map((r) => r.id)));
 
-  const removeRow = (row) => {
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
-    setSelected((prev) => prev.filter((id) => id !== row.id));
+  const removeRow = async (row) => {
+    if (!confirm(`Delete request #${row.id}?`)) return;
+    try {
+      const res = await fetch(`${API_BASE}/maintain/${row.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await fetchData();
+    } catch (e) {
+      alert(`Delete failed: ${e.message}`);
+    }
   };
 
   // ---------------- Create Request (modal form) ----------------
+  const [saving, setSaving] = useState(false);
+
   const [form, setForm] = useState({
     floor: "",
     room: "",
-    target: "",
-    issue: "",
-    maintainType: "",
+    target: "",        // 'asset' | 'building'
+    issue: "",         // 'air' | 'light' | 'wall' | 'plumbing'
     requestDate: "",
     maintainDate: "",
     completeDate: "",
     state: "Not Started",
+    // UI only
+    maintainType: "",
     technician: "",
     phone: "",
   });
-
-  const roomOptions = useMemo(
-    () => allRooms.filter((r) => r.floor === form.floor),
-    [form.floor]
-  );
 
   const onFormChange = (e) => {
     const { name, value } = e.target;
@@ -159,15 +157,14 @@ function MaintenanceRequest() {
       ...s,
       [name]: value,
       ...(name === "floor" ? { room: "" } : {}),
+      ...(name === "state" && value !== "Complete" ? { completeDate: "" } : {}),
     }));
   };
 
   const isFormValid =
-    form.floor &&
     form.room &&
     form.target &&
     form.issue &&
-    form.maintainType &&
     form.requestDate;
 
   const resetForm = () =>
@@ -176,85 +173,82 @@ function MaintenanceRequest() {
       room: "",
       target: "",
       issue: "",
-      maintainType: "",
       requestDate: "",
       maintainDate: "",
       completeDate: "",
       state: "Not Started",
+      maintainType: "",
       technician: "",
       phone: "",
     });
 
+  // ปิด modal แบบ programmatic (ไม่พึ่ง window.bootstrap)
   const closeModal = () => {
     const el = document.getElementById("requestModal");
-    if (window.bootstrap && el) window.bootstrap.Modal.getInstance(el)?.hide();
+    if (!el) return;
+    const inst = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+    el.addEventListener(
+      "hidden.bs.modal",
+      () => {
+        try { inst.dispose(); } catch {}
+        document.querySelectorAll(".modal-backdrop").forEach((n) => n.remove());
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("paddingRight");
+        document.body.style.removeProperty("overflow");
+      },
+      { once: true }
+    );
+    inst.hide();
   };
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
     if (!isFormValid) return;
 
-    const nextId = rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1;
+    try {
+      setSaving(true);
 
-    const newRow = {
-      id: nextId,
-      room: form.room,
-      floor: form.floor,
-      target: targetOptions.find((t) => t.value === form.target)?.label || form.target,
-      issue: issueOptions.find((i) => i.value === form.issue)?.label || form.issue,
-      maintainType:
-        maintainTypeOptions.find((m) => m.value === form.maintainType)?.label ||
-        form.maintainType,
-      requestDate: form.requestDate,
-      maintainDate: form.maintainDate || "-",
-      completeDate: form.completeDate || "-",
-      state: form.state || "Not Started",
-    };
+      const issueMeta = ISSUE_MAP[form.issue] ?? { cat: 5, label: form.issue };
+      const payload = {
+        targetType: form.target === "asset" ? 0 : 1,
+        roomId: null,
+        roomNumber: form.room, // ส่งเลขห้องได้เลย Service จะ resolve ให้
+        roomAssetId: null,
 
-    setRows((prev) => [newRow, ...prev]);
-    resetForm();
-    closeModal();
+        issueCategory: issueMeta.cat,
+        issueTitle: issueMeta.label,
+        issueDescription: "",
+
+        createDate: d2ldt(form.requestDate),
+        scheduledDate: d2ldt(form.maintainDate),
+        finishDate: form.state === "Complete" && form.completeDate ? d2ldt(form.completeDate) : null,
+      };
+
+      const res = await fetch(`${API_BASE}/maintain/create`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await fetchData();
+      resetForm();
+      closeModal(); // ปิดโมดัลหลังบันทึกสำเร็จ
+    } catch (e2) {
+      console.error(e2);
+      alert(`Create failed: ${e2.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // >>> แก้ให้ไปหน้า Details และส่ง mock tenant/technician ไปด้วย
+  // >>> ไปหน้า Details (โหลดตัวจริงในหน้านั้น)
   const viewRow = (row) => {
-    const detailRow = {
-      id: `RR${String(row.id).padStart(2, "0")}`,
-      ...row,
-      tenant: {
-        firstName: "John",
-        lastName: "Doe",
-        nationalId: "1-2345-67890-12-3",
-        phone: "012-345-6789",
-        email: "JohnDoe@gmail.com",
-        packageName: "1 Year",
-        signDate: "2024-12-30",
-        startDate: "2024-12-31",
-        endDate: "2025-12-31",
-      },
-      technician: { name: "PSomchai", phone: "012-345-6789" },
-    };
-
-    navigate("/maintenancedetails", { state: { row: detailRow, from: location.pathname } });
-  };
-
-  const MaintainTypePill = ({ type }) => {
-    const isFix = type.toLowerCase() === "fix";
-    const isShift = type.toLowerCase() === "shift";
-    return (
-      <span
-        className={`badge rounded-pill px-2 ${
-          isFix ? "bg-danger-subtle text-danger" : isShift ? "bg-info-subtle text-info" : "bg-secondary-subtle text-secondary"
-        }`}
-        style={{ fontWeight: 600 }}
-      >
-        {type}
-      </span>
-    );
+    navigate("/maintenancedetails", { state: { id: row.id, from: location.pathname } });
   };
 
   const StateBadge = ({ state }) => {
-    const complete = state.toLowerCase() === "complete";
+    const complete = (state || "").toLowerCase() === "complete";
     return (
       <span className={`badge rounded-pill ${complete ? "bg-success" : "bg-secondary-subtle text-secondary"}`}>
         {complete ? "Complete" : "Not Started"}
@@ -263,7 +257,7 @@ function MaintenanceRequest() {
   };
 
   return (
-    <Layout title="Maintenance Request" icon="pi pi-wrench" notifications={3}>
+    <Layout title="Maintenance Request" icon="pi pi-wrench" notifications={0}>
       <div className="container-fluid">
         <div className="row min-vh-100">
           {/* Main */}
@@ -273,11 +267,9 @@ function MaintenanceRequest() {
               <div className="card-header bg-white border-0">
                 <div className="tm-toolbar d-flex justify-content-between align-items-center">
                   <div className="d-flex align-items-center gap-3">
-                    <button className="btn btn-link tm-link p-0">
-                      <i className="bi bi-filter me-1" /> Filter
-                    </button>
-                    <button className="btn btn-link tm-link p-0">
-                      <i className="bi bi-arrow-down-up me-1" /> Sort
+                    <button className="btn btn-link tm-link p-0" onClick={fetchData} disabled={loading}>
+                      <i className={`bi ${loading ? "bi-arrow-repeat spin" : "bi-arrow-repeat"} me-1`} />
+                      Refresh
                     </button>
                     <div className="input-group tm-search">
                       <span className="input-group-text bg-white border-end-0">
@@ -306,8 +298,11 @@ function MaintenanceRequest() {
               </div>
             </div>
 
+            {/* Error */}
+            {err && <div className="alert alert-danger my-3">{err}</div>}
+
             {/* Table */}
-            <div className="table-wrapper card border-0 bg-white shadow-sm overflow-hidden">
+            <div className="table-wrapper card border-0 bg-white shadow-sm overflow-hidden mt-3">
               <div className="card-body p-0">
                 <div className="table-responsive">
                   <table className="table text-nowrap align-middle tm-left mb-0">
@@ -318,7 +313,6 @@ function MaintenanceRequest() {
                         <th>Floor</th>
                         <th>Target</th>
                         <th>Issue</th>
-                        <th>Maintain type</th>
                         <th>Request date</th>
                         <th>Maintain date</th>
                         <th>Complete date</th>
@@ -328,25 +322,25 @@ function MaintenanceRequest() {
                     </thead>
 
                     <tbody>
-                      {filteredRows.length ? (
-                        filteredRows.map((row, index) => (
+                      {loading ? (
+                        <tr><td colSpan="10" className="text-center">Loading...</td></tr>
+                      ) : pageRows.length ? (
+                        pageRows.map((row, index) => (
                           <tr key={row.id}>
-                            <td>{index + 1}</td>
+                            <td>{pageStart + index + 1}</td>
                             <td>{row.room}</td>
                             <td>{row.floor}</td>
                             <td>{row.target}</td>
                             <td>{row.issue}</td>
-                            <td><MaintainTypePill type={row.maintainType} /></td>
                             <td>{row.requestDate}</td>
                             <td>{row.maintainDate}</td>
                             <td>{row.completeDate}</td>
                             <td><StateBadge state={row.state} /></td>
-
                             <td>
                               <button
                                 className="btn btn-sm form-Button-Edit me-1"
                                 onClick={() => viewRow(row)}
-                                title="View"
+                                title="View / Edit"
                               >
                                 <i className="bi bi-eye-fill" />
                               </button>
@@ -362,7 +356,7 @@ function MaintenanceRequest() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="11" className="text-center">Data Not Found</td>
+                          <td colSpan="10" className="text-center">Data Not Found</td>
                         </tr>
                       )}
                     </tbody>
@@ -396,32 +390,23 @@ function MaintenanceRequest() {
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label">Floor</label>
-                        <select
+                        <input
                           name="floor"
-                          className="form-select"
+                          className="form-control"
+                          placeholder="e.g. 1"
                           value={form.floor}
                           onChange={onFormChange}
-                        >
-                          <option value="">Select Floor</option>
-                          {floorOptions.map((f) => (
-                            <option key={f.value} value={f.value}>{f.label}</option>
-                          ))}
-                        </select>
+                        />
                       </div>
                       <div className="col-md-6">
                         <label className="form-label">Room</label>
-                        <select
+                        <input
                           name="room"
-                          className="form-select"
+                          className="form-control"
+                          placeholder="e.g. 101"
                           value={form.room}
                           onChange={onFormChange}
-                          disabled={!form.floor}
-                        >
-                          <option value="">{form.floor ? "Select Room" : "Select floor first"}</option>
-                          {roomOptions.map((r) => (
-                            <option key={r.value} value={r.value}>{r.label}</option>
-                          ))}
-                        </select>
+                        />
                       </div>
                     </div>
                   </div>
@@ -439,9 +424,8 @@ function MaintenanceRequest() {
                           onChange={onFormChange}
                         >
                           <option value="">Select Target</option>
-                          {targetOptions.map((t) => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
-                          ))}
+                          <option value="asset">Asset</option>
+                          <option value="building">Building</option>
                         </select>
                       </div>
 
@@ -454,62 +438,32 @@ function MaintenanceRequest() {
                           onChange={onFormChange}
                         >
                           <option value="">Select Issue</option>
-                          {issueOptions.map((i) => (
-                            <option key={i.value} value={i.value}>{i.label}</option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="col-md-6">
-                        <label className="form-label">Maintain type</label>
-                        <select
-                          name="maintainType"
-                          className="form-select"
-                          value={form.maintainType}
-                          onChange={onFormChange}
-                        >
-                          <option value="">Select Maintain type</option>
-                          {maintainTypeOptions.map((m) => (
-                            <option key={m.value} value={m.value}>{m.label}</option>
-                          ))}
+                          <option value="air">Air conditioner</option>
+                          <option value="light">Light</option>
+                          <option value="wall">Wall</option>
+                          <option value="plumbing">Plumbing</option>
                         </select>
                       </div>
 
                       <div className="col-md-6">
                         <label className="form-label">Request date</label>
-                        <div className="input-group">
-                          <input
-                            type="date"
-                            className="form-control"
-                            name="requestDate"
-                            value={form.requestDate}
-                            onChange={onFormChange}
-                          />
-                        </div>
+                        <input
+                          type="date"
+                          className="form-control"
+                          name="requestDate"
+                          value={form.requestDate}
+                          onChange={onFormChange}
+                        />
                       </div>
 
                       <div className="col-md-6">
                         <label className="form-label">Maintain date</label>
-                        <div className="input-group">
-                          <input
-                            type="date"
-                            className="form-control"
-                            name="maintainDate"
-                            value={form.maintainDate}
-                            onChange={onFormChange}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="col-md-6">
-                        <label className="form-label">Complete date</label>
                         <input
                           type="date"
                           className="form-control"
-                          name="completeDate"
-                          value={form.completeDate}
+                          name="maintainDate"
+                          value={form.maintainDate}
                           onChange={onFormChange}
-                          disabled={form.state !== "Complete"}
                         />
                       </div>
 
@@ -525,33 +479,16 @@ function MaintenanceRequest() {
                           <option value="Complete">Complete</option>
                         </select>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Technician Information */}
-                  <div className="col-12">
-                    <h6 className="text-muted mb-2">Technician Information</h6>
-                    <div className="row g-3">
                       <div className="col-md-6">
-                        <label className="form-label">Technician’s name</label>
+                        <label className="form-label">Complete date</label>
                         <input
-                          type="text"
+                          type="date"
                           className="form-control"
-                          placeholder="Add Technician’s name"
-                          name="technician"
-                          value={form.technician}
+                          name="completeDate"
+                          value={form.completeDate}
                           onChange={onFormChange}
-                        />
-                      </div>
-                      <div className="col-md-6">
-                        <label className="form-label">Phone Number</label>
-                        <input
-                          type="tel"
-                          className="form-control"
-                          placeholder="Add Phone Number"
-                          name="phone"
-                          value={form.phone}
-                          onChange={onFormChange}
+                          disabled={form.state !== "Complete"}
                         />
                       </div>
                     </div>
@@ -562,15 +499,13 @@ function MaintenanceRequest() {
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => {
-                      resetForm();
-                      closeModal();
-                    }}
+                    data-bs-dismiss="modal"      // <-- ให้ Bootstrap ปิด modal เองเมื่อกด Cancel
+                    onClick={resetForm}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn btn-primary" disabled={!isFormValid}>
-                    Save
+                  <button type="submit" className="btn btn-primary" disabled={!isFormValid || saving}>
+                    {saving ? "Saving..." : "Save"}
                   </button>
                 </div>
               </form>
