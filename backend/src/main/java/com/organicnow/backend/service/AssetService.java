@@ -19,4 +19,9 @@ public class AssetService {
     public List<AssetDto> getAllAssets() {
         return assetRepository.findAllAssetOptions();
     }
+
+    // ✅ ดึงรายการ Asset ตาม roomId
+    public List<AssetDto> getAssetsByRoomId(Long roomId) {
+        return assetRepository.findAssetsByRoomId(roomId);
+    }
 }

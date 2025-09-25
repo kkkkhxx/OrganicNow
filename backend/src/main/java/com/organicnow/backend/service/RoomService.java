@@ -19,16 +19,25 @@ public class RoomService {
     private final AssetRepository assetRepository;
     private final MaintainRepository maintainRepository;
 
+    // ดึงข้อมูลห้องทั้งหมด
+    public List<RoomDetailDto> getAllRooms() {
+        // ดึงข้อมูลห้องจาก RoomRepository
+        return roomRepository.findAllRooms();
+    }
+
+    // ดึงข้อมูลห้องตาม roomId
     public RoomDetailDto getRoomDetail(Long roomId) {
+        // ดึงข้อมูลห้องจาก RoomRepository
         RoomDetailDto dto = roomRepository.findRoomDetail(roomId);
         if (dto == null) {
-            return null;
+            return null;  // ถ้าไม่พบห้อง
         }
 
-        // ✅ ดึง assets และ requests ของห้องนี้
+        // ดึงข้อมูล assets และ requests จาก repository อื่น
         List<AssetDto> assets = assetRepository.findAssetsByRoomId(roomId);
         List<RequestDto> requests = maintainRepository.findRequestsByRoomId(roomId);
 
+        // ตั้งค่า assets และ requests ใน dto
         dto.setAssets(assets);
         dto.setRequests(requests);
 

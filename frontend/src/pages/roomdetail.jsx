@@ -15,12 +15,13 @@ function RoomDetail() {
     useEffect(() => {
         const fetchRoomDetail = async () => {
             try {
+                // ดึงข้อมูลห้องที่รวมทั้ง asset และ request
                 const res = await axios.get(
                     `http://localhost:8080/rooms/${id}/detail`,
                     { withCredentials: true }
                 );
-                setRoomData(res.data);
-                setForm(res.data); // 🟢 preload form
+                setRoomData(res.data);  // เซ็ตข้อมูลห้องที่ได้จาก API
+                setForm(res.data);      // เตรียมข้อมูลสำหรับฟอร์ม
             } catch (err) {
                 console.error("Error fetching room detail:", err);
                 setError("Failed to fetch room details");
@@ -28,6 +29,7 @@ function RoomDetail() {
                 setLoading(false);
             }
         };
+
         fetchRoomDetail();
     }, [id]);
 
@@ -79,7 +81,6 @@ function RoomDetail() {
                                         <i className="bi bi-pencil me-1" /> Edit Room
                                     </button>
                                 </div>
-
                             </div>
                         </div>
 
