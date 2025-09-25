@@ -811,9 +811,9 @@ function TenantManagement() {
                     </option>
                     {rooms
                       .filter((r) => String(r.roomFloor) === String(selectedFloor))
-                      .filter((r) => !occupiedRoomIds.includes(r.id)) // ✅ ห้องหมดสัญญาจะกลับมาเลือกได้
+                      .filter((r) => !occupiedRoomIds.includes(r.roomId)) // ✅ ห้องหมดสัญญาจะกลับมาเลือกได้
                       .map((r) => (
-                        <option key={r.id} value={r.id}>
+                        <option key={r.roomId} value={r.roomId}>
                           {r.roomNumber}
                         </option>
                       ))}
