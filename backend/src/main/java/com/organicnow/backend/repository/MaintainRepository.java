@@ -1,14 +1,17 @@
 package com.organicnow.backend.repository;
 
+import com.organicnow.backend.dto.RequestDto;
 import com.organicnow.backend.model.Maintain;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-@Repository
 public interface MaintainRepository extends JpaRepository<Maintain, Long> {
+
+    @Query("SELECT new com.organicnow.backend.dto.RequestDto(r.id, r.issueTitle, r.issueDescription, r.createDate, r.scheduledDate, r.finishDate) FROM Maintain r WHERE r.room.id = :roomId")
+    List<RequestDto> findRequestsByRoomId(@Param("roomId") Long roomId);
 
     // ✅ ใช้สำหรับ Dashboard: เช็กว่าห้องยังมีงานซ่อมที่ยังไม่เสร็จ
     @Query("""
@@ -29,4 +32,5 @@ public interface MaintainRepository extends JpaRepository<Maintain, Long> {
         ORDER BY month
     """, nativeQuery = true)
     List<Object[]> countRequestsLast12Months();
+
 }

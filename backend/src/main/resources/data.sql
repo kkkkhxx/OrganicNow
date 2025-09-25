@@ -1,4 +1,6 @@
--- ========== Room (2 ชั้น × 12 ห้อง) ==========
+-- ========================
+-- Room (2 ชั้น × 12 ห้อง)
+-- ========================
 INSERT INTO room (room_floor, room_number)
 VALUES
     (1, '101'), (1, '102'), (1, '103'), (1, '104'),
@@ -7,17 +9,26 @@ VALUES
     (2, '201'), (2, '202'), (2, '203'), (2, '204'),
     (2, '205'), (2, '206'), (2, '207'), (2, '208'),
     (2, '209'), (2, '210'), (2, '211'), (2, '212')
-    ON CONFLICT (room_number) DO NOTHING;
+    ON CONFLICT DO NOTHING;
 
--- ========== Tenant ==========
+
+-- ========================
+-- Tenant
+-- ========================
 INSERT INTO tenant (first_name, last_name, phone_number, email, national_id) VALUES
                                                                                  ('Somchai', 'Sukjai', '0812345678', 'somchai@example.com', '1111111111111'),
                                                                                  ('Suda',   'Thongdee', '0898765432', 'suda@example.com',   '2222222222222'),
                                                                                  ('Anan',   'Meechai',  '0861122334', 'anan@example.com',   '3333333333333')
+
     ON CONFLICT (national_id) DO NOTHING;
 
--- ========== Contract Type ==========
+
+
+-- ========================
+-- Contract Type
+-- ========================
 INSERT INTO contract_type (contract_name, duration) VALUES
+
                                                                           ('3 เดือน', 3),
                                                                           ('6 เดือน', 6),
                                                                           ('9 เดือน', 9),

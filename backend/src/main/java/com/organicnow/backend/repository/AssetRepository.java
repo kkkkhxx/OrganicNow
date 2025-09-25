@@ -1,12 +1,5 @@
 package com.organicnow.backend.repository;
 
-<<<<<<< HEAD
-import com.organicnow.backend.model.RoomAsset;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface RoomAssetRepository extends JpaRepository<RoomAsset, Long> {}
-=======
-
 import com.organicnow.backend.dto.AssetDto;
 import com.organicnow.backend.model.RoomAsset;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,7 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface RoomAssetRepository extends JpaRepository<RoomAsset, Long> {
+public interface AssetRepository extends JpaRepository<RoomAsset, Long> {
 
     @Query("""
            SELECT new com.organicnow.backend.dto.AssetDto(
@@ -27,6 +20,14 @@ public interface RoomAssetRepository extends JpaRepository<RoomAsset, Long> {
            WHERE ra.room.id = :roomId
            """)
     List<AssetDto> findAssetsByRoomId(@Param("roomId") Long roomId);
-}
 
->>>>>>> 478e58059c31d1d62ce26de367c7298f75c2c5f1
+
+    @Query("""
+           SELECT new com.organicnow.backend.dto.AssetDto(
+               a.id, a.assetName, ag.assetGroupName
+           )
+           FROM Asset a
+           JOIN a.assetGroup ag
+           """)
+    List<AssetDto> findAllAssetOptions();
+}
