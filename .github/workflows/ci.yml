@@ -35,7 +35,7 @@ jobs:
 
       - name: Run Cypress E2E tests
         run: |
-          npx cypress run --record --key <your-cypress-dashboard-key>
+          npx cypress run --record --key ${{ secrets.CYPRESS_RECORD_KEY }}
           # เพิ่มการบันทึกผลการทดสอบ (screenshots, videos)
 
       - name: Upload Cypress test results
