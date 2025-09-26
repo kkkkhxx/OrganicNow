@@ -8,13 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.List;
 
-import java.util.Optional;
-
 public interface RoomRepository extends JpaRepository<Room, Long> {
-<<<<<<< HEAD
-    Optional<Room> findByRoomNumber(String roomNumber);
-}
-=======
 
     @Query("""
     SELECT new com.organicnow.backend.dto.RoomDetailDto(
@@ -52,4 +46,3 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
 
     Optional<Room> findByRoomNumber(String roomNumber);
 }
->>>>>>> 478e58059c31d1d62ce26de367c7298f75c2c5f1

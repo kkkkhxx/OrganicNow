@@ -1,10 +1,5 @@
 package com.organicnow.backend.service;
 
-<<<<<<< HEAD
-=======
-
-
->>>>>>> 478e58059c31d1d62ce26de367c7298f75c2c5f1
 import com.organicnow.backend.dto.CreateMaintainRequest;
 import com.organicnow.backend.dto.MaintainDto;
 import com.organicnow.backend.dto.UpdateMaintainRequest;
