@@ -1,0 +1,101 @@
+name: CI - Frontend & Backend Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend (Cypress E2E tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Cypress
+        run: npm install cypress
+
+      - name: Run Cypress E2E tests
+        run: |
+          npx cypress run --record --key <your-cypress-dashboard-key>
+          # เพิ่มการบันทึกผลการทดสอบ (screenshots, videos)
+
+      - name: Upload Cypress test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-cypress-results
+          path: frontend/cypress/videos
+
+  backend:
+    name: Backend (Maven tests with Postgres service)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: organicnow_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Run Maven tests
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres123
+        run: |
+          chmod +x mvnw || true
+          ./mvnw -q -DskipTests=false test
+
+      - name: Upload Maven surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/target/surefire-reports
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - run: echo "Frontend & Backend tests finished."
