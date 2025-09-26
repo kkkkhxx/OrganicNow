@@ -13,9 +13,7 @@ jobs:
   frontend:
     name: Frontend (Cypress E2E tests)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    # ทำงานใน root directory (ไม่ต้องใช้ working-directory)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,12 +34,12 @@ jobs:
       - name: Run Cypress E2E tests
         run: |
           npx cypress run --headless --record --key ${{ secrets.CYPRESS_RECORD_KEY }}
-
+        
       - name: Upload Cypress test results
         uses: actions/upload-artifact@v4
         with:
           name: frontend-cypress-results
-          path: frontend/cypress/videos
+          path: cypress/videos  # ใช้ path ที่ถูกต้องใน root directory (ไม่ใช่ frontend/cypress)
 
   backend:
     name: Backend (Maven tests with Postgres service)
