@@ -2,6 +2,7 @@ package com.organicnow.backend.service;
 
 import com.organicnow.backend.dto.CreateTenantContractRequest;
 import com.organicnow.backend.dto.TenantDetailDto;
+import com.organicnow.backend.dto.TenantDto;
 import com.organicnow.backend.dto.UpdateTenantContractRequest;
 import com.organicnow.backend.model.*;
 import com.organicnow.backend.repository.*;
@@ -21,11 +22,16 @@ import static org.mockito.Mockito.*;
 
 class TenantContractServiceTest {
 
-    @Mock private TenantRepository tenantRepository;
-    @Mock private RoomRepository roomRepository;
-    @Mock private PackagePlanRepository packagePlanRepository;
-    @Mock private ContractRepository contractRepository;
-    @Mock private InvoiceRepository invoiceRepository;
+    @Mock
+    private TenantRepository tenantRepository;
+    @Mock
+    private RoomRepository roomRepository;
+    @Mock
+    private PackagePlanRepository packagePlanRepository;
+    @Mock
+    private ContractRepository contractRepository;
+    @Mock
+    private InvoiceRepository invoiceRepository;
 
     @InjectMocks
     private TenantContractService tenantContractService;
@@ -38,6 +44,7 @@ class TenantContractServiceTest {
     // -------------------- CREATE --------------------
     @Test
     void create_shouldSaveTenantAndContract() {
+        // Mock request data
         CreateTenantContractRequest req = new CreateTenantContractRequest();
         req.setFirstName("John");
         req.setLastName("Doe");
@@ -51,24 +58,31 @@ class TenantContractServiceTest {
         req.setDeposit(BigDecimal.valueOf(5000));
         req.setRentAmountSnapshot(BigDecimal.valueOf(10000));
 
+        // Mock the tenant data
         Tenant tenant = Tenant.builder().id(1L).firstName("John").lastName("Doe").build();
         Room room = Room.builder().id(1L).roomNumber("101").roomFloor(1).build();
         PackagePlan plan = PackagePlan.builder().id(2L).price(BigDecimal.valueOf(10000)).build();
         Contract contract = Contract.builder().id(10L).tenant(tenant).room(room).packagePlan(plan).build();
 
-        when(tenantRepository.save(any(Tenant.class))).thenReturn(tenant);
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-        when(packagePlanRepository.findById(2L)).thenReturn(Optional.of(plan));
-        when(contractRepository.save(any(Contract.class))).thenReturn(contract);
+        // Mocking repository methods
+        when(tenantRepository.findByNationalId("1234567890123")).thenReturn(Optional.of(tenant)); // Return tenant when nationalId is searched
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(room)); // Mock room search
+        when(packagePlanRepository.findById(2L)).thenReturn(Optional.of(plan)); // Mock package plan search
+        when(contractRepository.save(any(Contract.class))).thenReturn(contract); // Mock contract saving
 
-        var result = tenantContractService.create(req);
+        // Call the service method
+        TenantDto result = tenantContractService.create(req);
 
+        // Assertions
         assertNotNull(result);
         assertEquals("John", result.getFirstName());
         assertEquals("Doe", result.getLastName());
-        assertEquals("101", result.getRoom());
+        assertEquals("101", result.getRoom()); // Ensure that the room number matches
+        assertEquals("John", result.getFirstName(), "First name should match");
+        assertEquals("Doe", result.getLastName(), "Last name should match");
 
-        verify(tenantRepository).save(any(Tenant.class));
+        // Verify that the repository methods were called
+        verify(tenantRepository).findByNationalId("1234567890123");
         verify(contractRepository).save(any(Contract.class));
     }
 
@@ -121,6 +135,7 @@ class TenantContractServiceTest {
     // -------------------- GET DETAIL --------------------
     @Test
     void getDetail_shouldReturnTenantDetailDto() {
+        // Mock tenant, room, contract
         Tenant tenant = Tenant.builder()
                 .id(1L).firstName("John").lastName("Doe")
                 .email("john@example.com").phoneNumber("0812345678")
@@ -135,24 +150,30 @@ class TenantContractServiceTest {
                 .status(1).deposit(BigDecimal.valueOf(5000)).rentAmountSnapshot(BigDecimal.valueOf(10000))
                 .build();
 
+        // Mock invoice
         Invoice invoice = Invoice.builder()
                 .id(100L)
                 .invoiceStatus(1)
-                .subTotal(1000)   // ✅ ใช้ Integer
+                .subTotal(1000)
                 .build();
 
+        // 🔹 Mock repository responses
         when(contractRepository.findById(10L)).thenReturn(Optional.of(contract));
-        when(invoiceRepository.findByContact_Id(10L)).thenReturn(List.of(invoice));
+        when(invoiceRepository.findByContact_IdOrderByIdDesc(10L)).thenReturn(List.of(invoice)); // <-- ต้องตรงกับ service
 
+        // Call service
         TenantDetailDto detail = tenantContractService.getDetail(10L);
 
+        // Assertions
         assertNotNull(detail);
         assertEquals("John", detail.getFirstName());
         assertEquals("101", detail.getRoom());
         assertEquals("6 เดือน", detail.getPackageName());
         assertEquals(1, detail.getInvoices().size());
 
+        // Verify repository interactions
         verify(contractRepository).findById(10L);
-        verify(invoiceRepository).findByContact_Id(10L);
+        verify(invoiceRepository).findByContact_IdOrderByIdDesc(10L);
     }
+
 }
