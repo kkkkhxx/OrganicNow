@@ -195,39 +195,39 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
 
-  publish-reports:   # 👈 เพิ่มตรงนี้
-    name: Publish Test Reports to GitHub Pages
-    runs-on: ubuntu-latest
-    needs: [backend, e2e]   # ให้รอ backend และ e2e เสร็จก่อน
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  # publish-reports:   # 👈 เพิ่มตรงนี้
+  #   name: Publish Test Reports to GitHub Pages
+  #   runs-on: ubuntu-latest
+  #   needs: [backend, e2e]   # ให้รอ backend และ e2e เสร็จก่อน
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Generate backend HTML report
-        working-directory: backend
-        run: |
-          chmod +x mvnw || true
-          ./mvnw -q surefire-report:report
+  #     - name: Generate backend HTML report
+  #       working-directory: backend
+  #       run: |
+  #         chmod +x mvnw || true
+  #         ./mvnw -q surefire-report:report
 
-      - name: Prepare _site folder
-        run: |
-          mkdir -p _site/backend
-          cp backend/target/site/surefire-report.html _site/backend/index.html
-          cat > _site/index.html <<'EOF'
-          <h1>CI Test Reports</h1>
-          <ul>
-            <li><a href="./backend/">Backend: Surefire Report</a></li>
-          </ul>
-          <p>Build: $GITHUB_SHA • Date: $(date)</p>
-          EOF
+  #     - name: Prepare _site folder
+  #       run: |
+  #         mkdir -p _site/backend
+  #         cp backend/target/site/surefire-report.html _site/backend/index.html
+  #         cat > _site/index.html <<'EOF'
+  #         <h1>CI Test Reports</h1>
+  #         <ul>
+  #           <li><a href="./backend/">Backend: Surefire Report</a></li>
+  #         </ul>
+  #         <p>Build: $GITHUB_SHA • Date: $(date)</p>
+  #         EOF
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
+  #     - name: Upload Pages artifact
+  #       uses: actions/upload-pages-artifact@v3
+  #       with:
+  #         path: _site
 
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+  #     - name: Deploy to GitHub Pages
+  #       uses: actions/deploy-pages@v4
 
   summary:
     name: CI Summary
