@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
 import Pagination from "../component/pagination";
+import { useToast } from "../component/Toast.jsx";
 import { pageSize as defaultPageSize } from "../config_variable";
 import * as bootstrap from "bootstrap"; // <-- ใช้ตัวนี้สำหรับควบคุมโมดัลแบบโปรแกรม
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -24,6 +25,54 @@ const d2ldt = (d) => (d ? `${d}T00:00:00` : null);
 function MaintenanceRequest() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showSuccess, showError } = useToast();
+
+  // ✅ Room data from backend
+  const [rooms, setRooms] = useState([]);
+  
+  // สำหรับ dropdown ห้อง (ใช้ข้อมูลจาก backend + fallback)
+  const roomsByFloor = useMemo(() => {
+    if (!rooms || rooms.length === 0) {
+      // Fallback data
+      return {
+        "1": ["101", "102", "103", "104", "105", "106", "107", "108", "109", "110", "111", "112"],
+        "2": ["201", "202", "203", "204", "205", "206", "207", "208", "209", "210", "211", "212"]
+      };
+    }
+
+    const result = {};
+    rooms.forEach(room => {
+      const floor = String(room.roomFloor);
+      if (!result[floor]) result[floor] = [];
+      result[floor].push(String(room.roomNumber));
+    });
+    return result;
+  }, [rooms]);
+
+  // ✅ ดึงข้อมูลห้องจาก backend
+  const fetchRooms = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/room/list`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json) && json.length > 0) {
+          setRooms(json);
+          console.log("✅ Rooms loaded for maintenance");
+        } else {
+          setRooms([]);
+        }
+      } else {
+        console.log("❌ Room API failed:", res.status);
+        setRooms([]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch rooms:", e);
+      setRooms([]);
+    }
+  };
 
   // ---------------- Pagination ----------------
   const [currentPage, setCurrentPage] = useState(1);
@@ -83,6 +132,7 @@ function MaintenanceRequest() {
 
   useEffect(() => {
     fetchData();
+    fetchRooms(); // ✅ Load rooms for dropdowns
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -128,8 +178,9 @@ function MaintenanceRequest() {
       });
       if (!res.ok) throw new Error(await res.text());
       await fetchData();
+      showSuccess("✅ ลบ Maintenance Request สำเร็จ!");
     } catch (e) {
-      alert(`Delete failed: ${e.message}`);
+      showError(`❌ ลบ Maintenance Request ไม่สำเร็จ: ${e.message}`);
     }
   };
 
@@ -151,21 +202,48 @@ function MaintenanceRequest() {
     phone: "",
   });
 
+  // Handle floor change and reset room selection
+  const handleFloorChange = (selectedFloor) => {
+    setForm(prev => ({ 
+      ...prev, 
+      floor: selectedFloor, 
+      room: "" // Reset room when floor changes
+    }));
+  };
+
+  // Get available floors from roomsByFloor
+  const availableFloors = Object.keys(roomsByFloor).sort();
+  
+  // Get available rooms for selected floor
+  const availableRooms = form.floor ? (roomsByFloor[form.floor] || []) : [];
+
   const onFormChange = (e) => {
     const { name, value } = e.target;
     setForm((s) => ({
       ...s,
       [name]: value,
       ...(name === "floor" ? { room: "" } : {}),
+      ...(name === "target" ? { issue: "" } : {}), // ✅ Clear issue when target changes
       ...(name === "state" && value !== "Complete" ? { completeDate: "" } : {}),
     }));
   };
 
-  const isFormValid =
-    form.room &&
-    form.target &&
-    form.issue &&
-    form.requestDate;
+  const isFormValid = useMemo(() => {
+    const valid = form.room &&
+      form.target &&
+      form.issue &&
+      form.requestDate;
+    
+    console.log("🔍 Form validation:", {
+      room: form.room,
+      target: form.target,
+      issue: form.issue,
+      requestDate: form.requestDate,
+      isValid: valid
+    });
+    
+    return valid;
+  }, [form.room, form.target, form.issue, form.requestDate]);
 
   const resetForm = () =>
     setForm({
@@ -234,9 +312,10 @@ function MaintenanceRequest() {
       await fetchData();
       resetForm();
       closeModal(); // ปิดโมดัลหลังบันทึกสำเร็จ
+      showSuccess("✅ สร้าง Maintenance Request สำเร็จ!");
     } catch (e2) {
       console.error(e2);
-      alert(`Create failed: ${e2.message}`);
+      showError(`❌ สร้าง Maintenance Request ไม่สำเร็จ: ${e2.message}`);
     } finally {
       setSaving(false);
     }
@@ -390,23 +469,32 @@ function MaintenanceRequest() {
                     <div className="row g-3">
                       <div className="col-md-6">
                         <label className="form-label">Floor</label>
-                        <input
-                          name="floor"
-                          className="form-control"
-                          placeholder="e.g. 1"
+                        <select
+                          className="form-select"
                           value={form.floor}
-                          onChange={onFormChange}
-                        />
+                          onChange={(e) => handleFloorChange(e.target.value)}
+                        >
+                          <option value="">Select Floor</option>
+                          {availableFloors.map(floor => (
+                            <option key={floor} value={floor}>{floor}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="col-md-6">
                         <label className="form-label">Room</label>
-                        <input
-                          name="room"
-                          className="form-control"
-                          placeholder="e.g. 101"
+                        <select
+                          className="form-select"
                           value={form.room}
-                          onChange={onFormChange}
-                        />
+                          onChange={(e) => setForm(prev => ({ ...prev, room: e.target.value }))}
+                          disabled={!form.floor}
+                        >
+                          <option value="">
+                            {form.floor ? "Select Room" : "Select Room"}
+                          </option>
+                          {availableRooms.map(room => (
+                            <option key={room} value={room}>{room}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -431,18 +519,29 @@ function MaintenanceRequest() {
 
                       <div className="col-md-6">
                         <label className="form-label">Issue</label>
-                        <select
-                          name="issue"
-                          className="form-select"
-                          value={form.issue}
-                          onChange={onFormChange}
-                        >
-                          <option value="">Select Issue</option>
-                          <option value="air">Air conditioner</option>
-                          <option value="light">Light</option>
-                          <option value="wall">Wall</option>
-                          <option value="plumbing">Plumbing</option>
-                        </select>
+                        {form.target === "building" ? (
+                          <input
+                            type="text"
+                            className="form-control"
+                            name="issue"
+                            value={form.issue}
+                            onChange={onFormChange}
+                            placeholder="Enter building issue"
+                          />
+                        ) : (
+                          <select
+                            name="issue"
+                            className="form-select"
+                            value={form.issue}
+                            onChange={onFormChange}
+                          >
+                            <option value="">Select Issue</option>
+                            <option value="air">Air conditioner</option>
+                            <option value="light">Light</option>
+                            <option value="wall">Wall</option>
+                            <option value="plumbing">Plumbing</option>
+                          </select>
+                        )}
                       </div>
 
                       <div className="col-md-6">
@@ -507,6 +606,17 @@ function MaintenanceRequest() {
                   <button type="submit" className="btn btn-primary" disabled={!isFormValid || saving}>
                     {saving ? "Saving..." : "Save"}
                   </button>
+                  {!isFormValid && (
+                    <div className="mt-2">
+                      <small className="text-danger">
+                        Please fill required fields: 
+                        {!form.room && " [Room]"}
+                        {!form.target && " [Target]"}
+                        {!form.issue && " [Issue]"}
+                        {!form.requestDate && " [Request Date]"}
+                      </small>
+                    </div>
+                  )}
                 </div>
               </form>
             </Modal>

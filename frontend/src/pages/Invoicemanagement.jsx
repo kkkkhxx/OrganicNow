@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
 import Pagination from "../component/pagination";
+import { useToast } from "../component/Toast.jsx";
 import { pageSize as defaultPageSize } from "../config_variable";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -12,6 +13,7 @@ const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080";
 
 function InvoiceManagement() {
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useToast();
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -25,15 +27,48 @@ function InvoiceManagement() {
   // ✅ สถานะกำลังลบใบแจ้งหนี้ (เพื่อ disable ปุ่ม/โชว์ spinner)
   const [deletingId, setDeletingId] = useState(null);
 
-  // สำหรับ dropdown ห้องตัวอย่าง (ยังไม่ได้ผูกกับ backend)
-  const roomsByFloor = {
-    "1": ["101", "102", "103", "104"],
-    "2": ["201", "202", "205", "206"],
-    "3": ["301", "302", "303"],
-  };
-
   // ====== DATA จาก Backend ======
   const [data, setData] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [contracts, setContracts] = useState([]);
+  const [tenants, setTenants] = useState([]);
+
+  // สำหรับ dropdown ห้อง (ใช้ข้อมูลจาก backend + fallback)
+  const roomsByFloor = useMemo(() => {
+    // ถ้าไม่มีข้อมูลจาก API ให้ใช้ fallback ตาม data.sql
+    if (!rooms || rooms.length === 0) {
+      console.log("⚠️ No rooms from API, using fallback data");
+      return {
+        "1": ["101", "102", "103", "104", "105", "106", "107", "108", "109", "110", "111", "112"],
+        "2": ["201", "202", "203", "204", "205", "206", "207", "208", "209", "210", "211", "212"]
+      };
+    }
+
+    const result = {};
+    console.log("🏗️ Processing rooms from API:", rooms); // Debug log
+    rooms.forEach(room => {
+      // ✅ ใช้ field ที่ถูกต้องจาก API response
+      const floor = String(room.roomFloor);
+      if (!result[floor]) result[floor] = [];
+      result[floor].push(String(room.roomNumber));
+    });
+    console.log("📋 roomsByFloor result:", result); // Debug log
+    return result;
+  }, [rooms]);
+
+  // ✅ Fallback data สำหรับ contracts (ตาม data.sql)
+  const contractsData = useMemo(() => [
+    { id: 1, roomId: 1, tenantId: 1, packageId: 1, status: 1 },
+    { id: 2, roomId: 2, tenantId: 2, packageId: 2, status: 1 },
+    { id: 3, roomId: 3, tenantId: 3, packageId: 3, status: 1 }
+  ], []);
+
+  // ✅ Fallback data สำหรับ tenants (ตาม data.sql)
+  const tenantsData = useMemo(() => [
+    { id: 1, firstName: "Somchai", lastName: "Sukjai", nationalId: "1111111111111" },
+    { id: 2, firstName: "Suda", lastName: "Thongdee", nationalId: "2222222222222" },
+    { id: 3, firstName: "Anan", lastName: "Meechai", nationalId: "3333333333333" }
+  ], []);
 
   // helper: LocalDate/LocalDateTime -> YYYY-MM-DD
   const d2str = (v) => {
@@ -80,6 +115,9 @@ function InvoiceManagement() {
 
   useEffect(() => {
     fetchData();
+    fetchRooms();
+    fetchContracts();
+    fetchTenants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,6 +144,79 @@ function InvoiceManagement() {
     }
   };
 
+  // ✅ ดึงข้อมูลห้องจาก backend
+  const fetchRooms = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/room/list`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        console.log("🏠 Rooms from API:", json); // Debug log
+        if (Array.isArray(json) && json.length > 0) {
+          setRooms(json);
+          console.log("✅ Rooms loaded successfully from API");
+        } else {
+          console.log("⚠️ Empty rooms array from API");
+          setRooms([]);
+        }
+      } else {
+        console.log("❌ Room API failed:", res.status);
+        // ใช้ fallback หาก API ล้มเหลว
+        setRooms([]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch rooms:", e);
+      // ใช้ fallback หาก API ล้มเหลว  
+      setRooms([]);
+    }
+  };
+
+  // ✅ ดึงข้อมูล contract จาก backend
+  const fetchContracts = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/contract/list`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        console.log("📄 Contracts from API:", json); // Debug log
+        setContracts(Array.isArray(json) ? json : []);
+      } else {
+        console.log("❌ Contract API failed:", res.status);
+        setContracts([]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch contracts:", e);
+      setContracts([]);
+    }
+  };
+
+  // ✅ ดึงข้อมูล tenant จาก backend
+  const fetchTenants = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/tenant/list`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        console.log("👥 Tenants from API:", json); // Debug log
+        // tenant/list ส่ง object {results: [...]} ไม่ใช่ array โดยตรง
+        const tenantArray = json.results || json;
+        setTenants(Array.isArray(tenantArray) ? tenantArray : []);
+      } else {
+        console.log("❌ Tenant API failed:", res.status);
+        setTenants([]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch tenants:", e);
+      setTenants([]);
+    }
+  };
+
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -123,16 +234,6 @@ function InvoiceManagement() {
     amountMin: "",
     amountMax: "",
   });
-  const clearFilters = () =>
-    setFilters({
-      status: "ALL",
-      payFrom: "",
-      payTo: "",
-      floor: "",
-      room: "",
-      amountMin: "",
-      amountMax: "",
-    });
 
   // ===== INVOICE FORM STATE (Modal) =====
   const [invForm, setInvForm] = useState({
@@ -156,26 +257,39 @@ function InvoiceManagement() {
 
   const mapStatusToCode = (s) => {
     if (s === "Complete") return 1;
-    if (s === "Cancelled") return 2;
-    return 0; // Incomplete / Pending / Overdue => 0
+    return 0; // Incomplete => 0
   };
 
-  // สร้างตัวเลือกห้องตามชั้น
+  // สร้างตัวเลือกห้องตามชั้น (ใช้ข้อมูลจาก backend)
   const roomOptions = useMemo(() => {
-    if (!invForm.floor) return [];
-    return roomsByFloor[invForm.floor] ?? [];
-  }, [invForm.floor]);
+    if (!invForm.floor || !roomsByFloor[invForm.floor]) return [];
+    return roomsByFloor[invForm.floor];
+  }, [invForm.floor, roomsByFloor]);
 
   // ถ้าเปลี่ยนชั้นแล้วห้องเดิมไม่อยู่ในตัวเลือก ให้รีเซ็ตห้อง
   useEffect(() => {
-    if (!invForm.floor) {
-      if (invForm.room !== "") setInvForm((p) => ({ ...p, room: "" }));
-      return;
-    }
-    if (invForm.room && !roomOptions.includes(invForm.room)) {
-      setInvForm((p) => ({ ...p, room: "" }));
+    if (!roomOptions.includes(invForm.room)) {
+      setInvForm((prev) => ({ ...prev, room: "" }));
     }
   }, [invForm.floor, roomOptions]); // eslint-disable-line
+
+  // ✅ Reset room filter เมื่อเปลี่ยน floor filter
+  useEffect(() => {
+    if (!roomOptions.includes(invForm.room)) {
+      setInvForm((prev) => ({ ...prev, room: "" }));
+    }
+  }, [invForm.floor, roomOptions]); // eslint-disable-line
+
+  const clearFilters = () =>
+    setFilters({
+      status: "ALL",
+      payFrom: "",
+      payTo: "",
+      floor: "",
+      room: "",
+      amountMin: "",
+      amountMax: "",
+    });
 
   // คำนวณบิลอัตโนมัติ
   useEffect(() => {
@@ -198,14 +312,9 @@ function InvoiceManagement() {
     let rows = [...data];
 
     rows = rows.filter((r) => {
-      if (filters.status !== "ALL") {
-        if (filters.status === "Overdue") {
-          // Overdue (ประมาณ): ยังไม่ชำระ
-          if (r.status !== "Incomplete") return false;
-        } else if (filters.status === "Pending") {
-          if (r.status !== "Incomplete") return false;
-        } else if (r.status !== filters.status) return false;
-      }
+      // ✅ ใช้ status จาก backend เท่านั้น: Complete, Incomplete
+      if (filters.status !== "ALL" && r.status !== filters.status) return false;
+      
       if (filters.payFrom && r.payDate && r.payDate < filters.payFrom) return false;
       if (filters.payTo && r.payDate && r.payDate > filters.payTo) return false;
       if (filters.floor && String(r.floor) !== String(filters.floor)) return false;
@@ -278,9 +387,11 @@ function InvoiceManagement() {
 
       // ลบสำเร็จ → ตัดแถวออกจาก state
       setData((prev) => prev.filter((x) => x.id !== id));
+      showSuccess("🗑️ ลบ Invoice สำเร็จแล้ว!");
     } catch (e) {
       console.error(e);
       setErr(e.message || "ลบไม่สำเร็จ");
+      showError(`❌ ลบ Invoice ล้มเหลว: ${e.message}`);
     } finally {
       setDeletingId(null);
     }
@@ -348,10 +459,12 @@ function InvoiceManagement() {
       }
 
       await fetchData(); // refresh list
+      showSuccess("🎉 สร้าง Invoice สำเร็จแล้ว!");
       return true;
     } catch (e) {
       console.error(e);
       setErr(`Create invoice failed: ${e.message}`);
+      showError(`❌ สร้าง Invoice ล้มเหลว: ${e.message}`);
       return false;
     } finally {
       setSaving(false);
@@ -479,13 +592,11 @@ function InvoiceManagement() {
                             className={`badge ${
                               item.status === "Complete"
                                 ? "bg-success"
-                                : item.status === "Cancelled"
-                                ? "bg-secondary"
                                 : "bg-warning text-dark"
                             }`}
                           >
                             <i className="bi bi-circle-fill me-1"></i>
-                            {item.status}
+                            {item.status === "Complete" ? "Complete" : "Incomplete"}
                           </span>
                         </td>
                         <td className="align-middle text-start">{item.payDate}</td>
@@ -610,9 +721,11 @@ function InvoiceManagement() {
                       <option value="" hidden>
                         Select Floor
                       </option>
-                      <option>1</option>
-                      <option>2</option>
-                      <option>3</option>
+                      {Object.keys(roomsByFloor).sort().map((floor) => (
+                        <option key={floor} value={floor}>
+                          {floor}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -714,11 +827,8 @@ function InvoiceManagement() {
                     value={invForm.status}
                     onChange={(e) => setInvForm((p) => ({ ...p, status: e.target.value }))}
                   >
-                    <option>Incomplete</option>
-                    <option>Complete</option>
-                    <option>Pending</option>
-                    <option>Overdue</option>
-                    <option>Cancelled</option>
+                    <option value="Incomplete">📋 Incomplete (ยังไม่ชำระ)</option>
+                    <option value="Complete">✅ Complete (ชำระแล้ว)</option>
                   </select>
                 </div>
               </div>
@@ -761,11 +871,8 @@ function InvoiceManagement() {
                 onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
               >
                 <option value="ALL">All</option>
-                <option value="Complete">Complete</option>
-                <option value="Pending">Pending</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Incomplete">Incomplete</option>
-                <option value="Cancelled">Cancelled</option>
+                <option value="Complete">✅ Complete (ชำระแล้ว)</option>
+                <option value="Incomplete">📋 Incomplete (ยังไม่ชำระ)</option>
               </select>
             </div>
 

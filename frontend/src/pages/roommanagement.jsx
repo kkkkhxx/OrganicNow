@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Layout from "../component/layout";
 import Pagination from "../component/pagination";
+import { useToast } from "../component/Toast.jsx";
 import { pageSize as defaultPageSize, apiPath } from "../config_variable";
 import "../assets/css/roommanagement.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
@@ -11,6 +12,7 @@ import "bootstrap-icons/font/bootstrap-icons.css";
 
 function RoomManagement() {
     const navigate = useNavigate();
+    const { showSuccess, showError, showInfo } = useToast();
 
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
@@ -32,6 +34,7 @@ function RoomManagement() {
         } catch (err) {
             console.error("Error fetching rooms:", err);
             setError("เกิดข้อผิดพลาดในการดึงข้อมูลห้อง");
+            showError("❌ ไม่สามารถดึงข้อมูลห้องได้ กรุณาลองใหม่");
         }
     };
 
