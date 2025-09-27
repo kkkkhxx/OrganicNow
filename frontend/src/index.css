@@ -66,3 +66,126 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Enhanced Pagination Styles */
+.pagination {
+  --bs-pagination-padding-x: 0.75rem;
+  --bs-pagination-padding-y: 0.375rem;
+  --bs-pagination-font-size: 0.875rem;
+  --bs-pagination-color: #6c757d;
+  --bs-pagination-bg: #fff;
+  --bs-pagination-border-width: 1px;
+  --bs-pagination-border-color: #dee2e6;
+  --bs-pagination-border-radius: 0.375rem;
+  --bs-pagination-hover-color: #0056b3;
+  --bs-pagination-hover-bg: #e9ecef;
+  --bs-pagination-hover-border-color: #dee2e6;
+  --bs-pagination-active-color: #fff;
+  --bs-pagination-active-bg: #0d6efd;
+  --bs-pagination-active-border-color: #0d6efd;
+  --bs-pagination-disabled-color: #6c757d;
+  --bs-pagination-disabled-bg: #fff;
+  --bs-pagination-disabled-border-color: #dee2e6;
+}
+
+.pagination .page-link {
+  transition: all 0.15s ease-in-out;
+  min-width: 40px;
+  text-align: center;
+  border-radius: 0.25rem;
+  margin: 0 2px;
+}
+
+.pagination .page-item.active .page-link {
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+  background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%);
+}
+
+.pagination .page-link:hover:not(.disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination .page-item.disabled .page-link {
+  opacity: 0.5;
+}
+
+/* Pagination container styling */
+nav[aria-label="Page navigation"] {
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  margin-top: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+nav[aria-label="Page navigation"] > div {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 0.5rem;
+  border: 1px solid #e9ecef;
+}
+
+/* Page size selector styling */
+.form-select-sm {
+  border-color: #ced4da;
+  transition: all 0.15s ease-in-out;
+  border-radius: 0.375rem;
+}
+
+.form-select-sm:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Custom button styles for pagination actions */
+.btn-success.btn-sm, .btn-outline-secondary.btn-sm {
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+}
+
+/* Responsive pagination improvements */
+@media (max-width: 768px) {
+  .pagination .page-link {
+    min-width: 35px;
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8rem;
+  }
+  
+  nav[aria-label="Page navigation"] > div {
+    padding: 1rem !important;
+  }
+  
+  .pagination .page-item {
+    margin: 0 1px;
+  }
+}
+
+/* Enhanced visual effects */
+.pagination .page-item:first-child .page-link,
+.pagination .page-item:last-child .page-link {
+  font-weight: 600;
+}
+
+.pagination .page-link i {
+  font-size: 0.875rem;
+}
+
+/* Beautiful gradient for active state */
+.pagination .page-item.active .page-link {
+  background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%) !important;
+  border-color: #0d6efd !important;
+  transform: scale(1.05);
+}
+
+/* Subtle animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+nav[aria-label="Page navigation"] {
+  animation: fadeIn 0.3s ease-out;
+}

@@ -191,6 +191,18 @@ function MaintenanceSchedule() {
   const totalRecords = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handlePageSizeChange = (size) => {
+    const newSize = Number(size) || 10;
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     setCurrentPage(1);
   }, [search, sortAsc, pageSize, filters]);
@@ -473,9 +485,9 @@ function MaintenanceSchedule() {
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={setCurrentPage}
+              onPageChange={handlePageChange}
               totalRecords={totalRecords}
-              onPageSizeChange={setPageSize}
+              onPageSizeChange={handlePageSizeChange}
             />
           </div>
         </div>

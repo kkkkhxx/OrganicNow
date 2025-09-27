@@ -20,6 +20,18 @@ function AssetManagement() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize, setPageSize] = useState(defaultPageSize || 10);
 
+    const handlePageChange = (page) => {
+        if (page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+        }
+    };
+
+    const handlePageSizeChange = (size) => {
+        const newSize = Number(size) || 10;
+        setPageSize(newSize);
+        setCurrentPage(1);
+    };
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         let rows = [...packages];
@@ -225,9 +237,9 @@ function AssetManagement() {
                         <Pagination
                             currentPage={currentPage}
                             totalPages={totalPages}
-                            onPageChange={setCurrentPage}
+                            onPageChange={handlePageChange}
                             totalRecords={totalRecords}
-                            onPageSizeChange={setPageSize}
+                            onPageSizeChange={handlePageSizeChange}
                         />
                     </div>
                 </div>
