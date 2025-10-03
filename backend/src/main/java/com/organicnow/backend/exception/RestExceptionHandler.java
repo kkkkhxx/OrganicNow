@@ -61,6 +61,14 @@ public class RestExceptionHandler {
     public ResponseEntity<?> handleBusiness(RuntimeException ex) {
         String msg = ex.getMessage();
 
+        if ("duplicate_group_name".equals(msg)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "timestamp", LocalDateTime.now().toString(),
+                    "status", 409,
+                    "message", "duplicate_group_name"
+            ));
+        }
+
         if ("tenant_already_has_active_contract".equals(msg)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                     "timestamp", LocalDateTime.now().toString(),
@@ -87,6 +95,9 @@ public class RestExceptionHandler {
 
         if (c.contains("uk_tenant_national_id") || c.contains("national_id")) {
             return "duplicate_national_id";
+        }
+        if (c.contains("uk_asset_group_name")) {
+            return "duplicate_group_name";
         }
         return "duplicate";
     }
