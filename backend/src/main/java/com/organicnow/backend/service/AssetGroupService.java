@@ -1,29 +1,40 @@
 package com.organicnow.backend.service;
 
+import com.organicnow.backend.dto.AssetGroupDropdownDto;
 import com.organicnow.backend.model.Asset;
 import com.organicnow.backend.model.AssetGroup;
 import com.organicnow.backend.repository.AssetGroupRepository;
 import com.organicnow.backend.repository.AssetRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class AssetGroupService {
 
-    @Autowired
-    private AssetGroupRepository assetGroupRepository;
+    private final AssetGroupRepository assetGroupRepository;
+    private final AssetRepository assetRepository;
 
-    @Autowired
-    private AssetRepository assetRepository;
+    // ✅ Dropdown
+    @Transactional(readOnly = true)
+    public List<AssetGroupDropdownDto> getAllGroupsForDropdown() {
+        return assetGroupRepository.findAll().stream()
+                .map(group -> AssetGroupDropdownDto.builder()
+                        .id(group.getId())
+                        .name(group.getAssetGroupName())
+                        .build())
+                .toList();
+    }
 
-    // Get all Asset Groups
+    // ✅ Get all (Entity)
     public List<AssetGroup> getAllAssetGroups() {
         return assetGroupRepository.findAll();
     }
 
-    // Create Asset Group
+    // ✅ Create
     public AssetGroup createAssetGroup(AssetGroup assetGroup) {
         if (assetGroupRepository.existsByAssetGroupName(assetGroup.getAssetGroupName())) {
             throw new RuntimeException("duplicate_group_name");
@@ -31,12 +42,11 @@ public class AssetGroupService {
         return assetGroupRepository.save(assetGroup);
     }
 
-    // Update Asset Group
+    // ✅ Update
     public AssetGroup updateAssetGroup(Long id, AssetGroup assetGroup) {
         AssetGroup existingAssetGroup = assetGroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Asset Group not found with id " + id));
 
-        // ป้องกัน rename ไปซ้ำกับ group อื่น
         if (!existingAssetGroup.getAssetGroupName().equals(assetGroup.getAssetGroupName())
                 && assetGroupRepository.existsByAssetGroupName(assetGroup.getAssetGroupName())) {
             throw new RuntimeException("duplicate_group_name");
@@ -46,7 +56,7 @@ public class AssetGroupService {
         return assetGroupRepository.save(existingAssetGroup);
     }
 
-    // Delete Asset Group + ลบ Assets ด้วย
+    // ✅ Delete group + assets
     public int deleteAssetGroup(Long id) {
         List<Asset> assets = assetRepository.findByAssetGroupId(id);
         int deletedCount = assets.size();

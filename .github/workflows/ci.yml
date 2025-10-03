@@ -1,0 +1,219 @@
+name: CI - Frontend & Backend Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (Maven tests with Postgres service)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: organicnow_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+
+      - name: Build & Test (JaCoCo)
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres123
+        run: |
+          chmod +x mvnw || true
+          ./mvnw -q -U clean verify
+
+      - name: Upload Maven surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: backend/target/surefire-reports
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-site
+          path: backend/target/site/jacoco
+
+      - name: Upload JaCoCo XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-xml
+          path: backend/target/site/jacoco/jacoco.xml
+
+  e2e:
+    name: E2E via docker-compose + Cypress (root)
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: docker-compose.yml
+      BASE_URL: http://localhost:5173
+      HEALTH_URL_BACKEND: http://localhost:8080/actuator/health
+      HEALTH_URL_FRONTEND: http://localhost:5173
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20 (for Cypress CLI at repo root)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+
+      - name: Install Cypress deps (repo root)
+        run: |
+          npm ci
+          npx cypress install
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: docker compose up (build & run)
+        run: |
+          docker compose -f "${COMPOSE_FILE}" up -d --build
+          docker ps
+
+      - name: Wait for backend to be healthy
+        run: |
+          for i in {1..60}; do
+            curl -fsSL "$HEALTH_URL_BACKEND" && exit 0
+            echo "Waiting for backend... ($i/60)"
+            sleep 2
+          done
+          echo "Backend not healthy in time"; docker ps; exit 1
+
+      - name: Wait for frontend to be up
+        run: |
+          for i in {1..60}; do
+            curl -fsS "$HEALTH_URL_FRONTEND" && exit 0
+            echo "Waiting for frontend... ($i/60)"
+            sleep 2
+          done
+          echo "Frontend not up in time"; docker ps; exit 1
+
+      - name: Run Cypress E2E (using root cypress.config.js)
+        env:
+          CYPRESS_baseUrl: ${{ env.BASE_URL }}
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        run: |
+          npx cypress run --headless ${CYPRESS_RECORD_KEY:+--record --key $CYPRESS_RECORD_KEY}
+
+      - name: Upload Cypress artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-cypress-results
+          path: |
+            cypress/videos
+            cypress/screenshots
+
+      - name: Teardown containers
+        if: always()
+        run: docker compose -f "${{ env.COMPOSE_FILE }}" down -v
+
+  docker-push-frontend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Build & Push Frontend Image
+    runs-on: ubuntu-latest
+    needs: [backend, e2e]
+    env:
+      IMAGE_NAME: heangkung/organicnow-frontend
+      TAG_SHA: ${{ github.sha }}
+      TAG_LATEST: latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push (SHA tag)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}
+
+      - name: Also tag :latest when on main
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
+
+  docker-push-backend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    name: Build & Push Backend Image
+    runs-on: ubuntu-latest
+    needs: [backend, e2e]
+    env:
+      IMAGE_NAME: heangkung/organicnow-backend
+      TAG_SHA: ${{ github.sha }}
+      TAG_LATEST: latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push (SHA tag)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}
+
+      - name: Also tag :latest when on main
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [backend, e2e, docker-push-frontend, docker-push-backend]
+    steps:
+      - run: echo "Backend tests + E2E (compose) + Push frontend & backend images finished."
