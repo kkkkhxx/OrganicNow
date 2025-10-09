@@ -7,14 +7,13 @@ import com.organicnow.backend.model.PackagePlan;
 import com.organicnow.backend.repository.ContractTypeRepository;
 import com.organicnow.backend.repository.PackagePlanRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
-
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PackagePlanService {
@@ -28,14 +27,14 @@ public class PackagePlanService {
         this.contractTypeRepository = contractTypeRepository;
     }
 
+    // ✅ CREATE package plan
     public void createPackage(PackagePlanRequestDto dto) {
-        // หา ContractType จาก id ที่ส่งมา
         ContractType contractType = contractTypeRepository.findById(dto.getContractTypeId())
                 .orElseThrow(() -> new ResponseStatusException(
                         NOT_FOUND, "ContractType not found with id " + dto.getContractTypeId()
                 ));
 
-        // ปิดการใช้งาน PackagePlan เดิมที่ contractType.name ซ้ำ
+        // deactivate ตัวเก่าที่ชื่อ contract type ซ้ำ
         List<PackagePlan> existingPackages =
                 packagePlanRepository.findByContractType_NameAndIsActive(contractType.getName(), 1);
 
@@ -44,7 +43,7 @@ public class PackagePlanService {
             packagePlanRepository.save(oldPlan);
         }
 
-        // สร้าง PackagePlan ใหม่
+        // create ใหม่
         PackagePlan packagePlan = PackagePlan.builder()
                 .price(dto.getPrice())
                 .isActive(dto.getIsActive())
@@ -54,19 +53,26 @@ public class PackagePlanService {
         packagePlanRepository.save(packagePlan);
     }
 
+    // ✅ GET packages list
     public List<PackagePlanDto> getAllPackages() {
         return packagePlanRepository.findAll()
                 .stream()
-                .map(p -> new PackagePlanDto(
-                        p.getId(),
-                        p.getPrice(),
-                        p.getIsActive(),
-                        p.getContractType().getName(),
-                        p.getContractType().getDuration()
-                ))
+                .map(p -> {
+                    var ct = p.getContractType();
+                    return new PackagePlanDto(
+                            p.getId(),
+                            p.getPrice(),
+                            p.getIsActive(),
+                            ct != null ? ct.getName() : null,
+                            ct != null ? ct.getDuration() : null,
+                            ct != null ? ct.getId() : null,        // ✅ เพิ่ม
+                            ct != null ? ct.getName() : null       // ✅ เพิ่ม
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
+    // ✅ TOGGLE active status (0 <-> 1)
     @Transactional
     public PackagePlanDto togglePackageStatus(Long packageId) {
         PackagePlan pkg = packagePlanRepository.findById(packageId)
@@ -76,13 +82,16 @@ public class PackagePlanService {
         pkg.setIsActive(current == 1 ? 0 : 1);
         PackagePlan saved = packagePlanRepository.save(pkg);
 
+        var ct = saved.getContractType();
+
         return new PackagePlanDto(
                 saved.getId(),
                 saved.getPrice(),
                 saved.getIsActive(),
-                saved.getContractType() != null ? saved.getContractType().getName() : null,
-                saved.getContractType() != null ? saved.getContractType().getDuration() : null
+                ct != null ? ct.getName() : null,
+                ct != null ? ct.getDuration() : null,
+                ct != null ? ct.getId() : null,          // ✅ เพิ่ม
+                ct != null ? ct.getName() : null         // ✅ เพิ่ม
         );
     }
 }
-
