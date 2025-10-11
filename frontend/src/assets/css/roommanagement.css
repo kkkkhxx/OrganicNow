@@ -1,22 +1,24 @@
-/* Center the content in table header and cells */
+/* ================================
+   Table Layout & Alignment
+================================ */
 .table th,
 .table td {
   padding: 12px;
   text-align: center !important; /* Center text */
   border-bottom: 1px solid #ddd;
   word-wrap: break-word;
-  min-width: 100px;
+  min-width: 120px; /* Ensure consistent width */
   vertical-align: middle;
 }
 
-/* ✅ Left-alignment enforced for table with tm-left class */
+/* ✅ Left alignment for tm-left class */
 .table.tm-left th,
 .table.tm-left td {
   text-align: left !important;
   vertical-align: middle;
 }
 
-/* Adjust checkbox cell alignment */
+/* Checkbox column */
 .table.tm-left th.checkbox-cell,
 .table.tm-left td.checkbox-cell {
   text-align: center !important;
@@ -40,14 +42,9 @@
   display: block;
 }
 
-/* Table header styling */
-.table th.header-color {
-  background-color: #0084f7;
-  color: #fff;
-  font-weight: bold;
-}
-
-/* Center header color and border radius */
+/* ================================
+   Table Header Styling
+================================ */
 .table thead.header-color th {
   background-color: #0084f7;
   color: #fff;
@@ -62,12 +59,13 @@
   border-top-right-radius: 10px;
 }
 
-/* Card styling */
+/* ================================
+   Card & Toolbar
+================================ */
 .card {
   border-radius: 12px;
 }
 
-/* Toolbar styling */
 .tm-toolbar {
   display: flex;
   justify-content: space-between;
@@ -85,12 +83,11 @@
   white-space: nowrap;
 }
 
-/* Input group styling */
 .input-group .form-control {
   box-shadow: none;
 }
 
-/* Button link styling */
+/* Button link cleanup */
 .btn-link {
   text-decoration: none;
   font-weight: 500;
@@ -104,7 +101,9 @@
   max-width: none;
 }
 
-/* Status card styling */
+/* ================================
+   Status Card Styling
+================================ */
 .status-card {
   border-radius: 12px;
   padding: 16px;
@@ -114,7 +113,6 @@
   box-shadow: 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-/* Status variations */
 .status-complete {
   background-color: #d4f4dd;
 }
@@ -141,7 +139,9 @@
   font-weight: bold;
 }
 
-/* Card body content layout */
+/* ================================
+   Card Body Layout
+================================ */
 .card-body p {
   display: grid;
   grid-template-columns: 140px auto;
@@ -155,7 +155,7 @@
   align-items: center;
 }
 
-/* Badge styling */
+/* Badge for Package */
 .package-badge {
   display: inline-block;
   font-size: 0.75rem;
@@ -164,21 +164,89 @@
   text-align: center;
 }
 
-/* Remove outline/box-shadow for status buttons */
+/* Remove outline from buttons inside tables */
 .table.tm-left td .btn.btn-link {
   line-height: 1;
   box-shadow: none;
 }
+
 .table.tm-left td .btn.btn-link:focus {
   box-shadow: none;
   outline: none;
 }
 
-/* Responsive for mobile */
+/* ================================
+   Status Badges (Room)
+================================ */
+.bg-warning {
+  background-color: #f0ad4e !important; /* Repair */
+}
+
+.badge.bg-danger {
+  background-color: #dc3545 !important; /* Unavailable */
+  font-weight: 600;
+}
+
+.badge.bg-success {
+  background-color: #198754 !important; /* Available */
+  font-weight: 600;
+}
+
+/* ================================
+   Pending Request Indicators
+================================ */
+.pending-request-indicator {
+  color: #dc3545 !important; /* Red - Active */
+  font-size: 20px;
+  font-weight: bold;
+  vertical-align: middle;
+}
+
+.no-pending-request-indicator {
+  color: #6c757d !important; /* Gray - Inactive */
+  font-size: 20px;
+  vertical-align: middle;
+}
+
+/* Legacy fallback for Bootstrap text colors */
+.text-danger {
+  color: red;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.text-muted {
+  color: gray;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* ================================
+   Request Dots (Optional Circle)
+================================ */
+.request-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.request-active {
+  background-color: #dc3545; /* Red */
+}
+
+.request-inactive {
+  background-color: #ccc; /* Gray */
+}
+
+/* ================================
+   Responsive Layout
+================================ */
 @media (max-width: 768px) {
   .table th,
   .table td {
     padding: 8px;
+    font-size: 14px;
   }
 
   .tm-toolbar {
@@ -194,61 +262,3 @@
     width: 100%;
   }
 }
-
-/* Request dot styles */
-.request-dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.request-active {
-  background-color: #dc3545; /* Red */
-}
-
-.request-inactive {
-  background-color: #ccc; /* Gray */
-}
-/* Center the content in table header and cells */
-.table th,
-.table td {
-  padding: 12px;
-  text-align: center; /* Center text */
-  border-bottom: 1px solid #ddd;
-  word-wrap: break-word;
-  min-width: 120px; /* Ensure columns have equal width */
-  vertical-align: middle;
-}
-/* จัดสไตล์จุดสีแดง */
-/* จัดสไตล์จุดสีแดง */
-.text-danger {
-    color: red;
-    font-size: 20px;
-    font-weight: bold;
-}
-
-/* จัดสไตล์จุดสีเทา */
-.text-muted {
-    color: gray;
-    font-size: 20px;
-    font-weight: bold;
-}
-
-/* สถานะห้อง repair */
-.bg-warning {
-    background-color: #f0ad4e !important;
-}
-.pending-request-indicator {
-    color: #dc3545 !important; /* สีแดง Bootstrap */
-    font-size: 20px;
-    font-weight: bold;
-}
-
-.no-pending-request-indicator {
-    color: #6c757d !important; /* สีเทา Bootstrap */
-    font-size: 20px;
-}
-
-
-

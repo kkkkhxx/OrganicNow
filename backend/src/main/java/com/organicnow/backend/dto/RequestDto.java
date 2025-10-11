@@ -22,6 +22,14 @@ public class RequestDto {
         this.finishDate = finishDate;
     }
 
+    // ✅ เพิ่ม constructor สำหรับ query ที่ใช้ใน MaintainRepository
+    public RequestDto(Long id, String issueTitle, LocalDateTime scheduledDate, LocalDateTime finishDate) {
+        this.id = id;
+        this.issueTitle = issueTitle;
+        this.scheduledDate = scheduledDate;
+        this.finishDate = finishDate;
+    }
+
     // ===== Getters & Setters =====
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
