@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "sweetalert2": "^11.23.0"
+  },
+  "devDependencies": {
+    "cypress": "^15.3.0"
   }
 }
