@@ -15,14 +15,19 @@ public class Asset {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "asset_id")
-    private Long id; // Asset_id
+    private Long id;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_group_id", nullable = false, foreignKey = @ForeignKey(name = "fk_asset_asset_group"))
-    private AssetGroup assetGroup; // AssetGroup_id -> AssetGroup
+    private AssetGroup assetGroup;
 
     @NotBlank
     @Size(max = 120)
     @Column(name = "asset_name", nullable = false, length = 120)
-    private String assetName; // ชื่อของ เช่น "ตู้เย็น LG"
+    private String assetName;
+
+    @NotBlank
+    @Size(max = 20)
+    @Column(name = "status", nullable = false, length = 20)
+    private String status; // available | in_use | maintenance | broken | deleted
 }

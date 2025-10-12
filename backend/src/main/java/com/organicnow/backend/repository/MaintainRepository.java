@@ -10,7 +10,15 @@ import java.util.List;
 
 public interface MaintainRepository extends JpaRepository<Maintain, Long> {
 
-    @Query("SELECT new com.organicnow.backend.dto.RequestDto(r.id, r.issueTitle, r.issueDescription, r.createDate, r.scheduledDate, r.finishDate) FROM Maintain r WHERE r.room.id = :roomId")
+    // ✅ ดึงรายการ Maintain (Request) ทั้งหมดในห้องนั้น
+    @Query("""
+        SELECT new com.organicnow.backend.dto.RequestDto(
+            m.id, m.issueTitle, m.scheduledDate, m.finishDate
+        )
+        FROM Maintain m
+        WHERE m.room.id = :roomId
+        ORDER BY m.scheduledDate DESC
+    """)
     List<RequestDto> findRequestsByRoomId(@Param("roomId") Long roomId);
 
     // ✅ ใช้สำหรับ Dashboard: เช็กว่าห้องยังมีงานซ่อมที่ยังไม่เสร็จ
@@ -18,11 +26,11 @@ public interface MaintainRepository extends JpaRepository<Maintain, Long> {
         select case when count(m) > 0 then true else false end
         from Maintain m
         where m.room.id = :roomId
-          and m.finishDate >= CURRENT_TIMESTAMP
+          and m.finishDate is null
     """)
     boolean existsActiveMaintainByRoomId(Long roomId);
 
-    // ✅ Dashboard: นับจำนวน maintain ต่อเดือน (12 เดือนล่าสุด) → ใช้ Native SQL
+    // ✅ Dashboard: นับจำนวน maintain ต่อเดือน (12 เดือนล่าสุด)
     @Query(value = """
         SELECT to_char(m.create_date, 'YYYY-MM') AS month,
                COUNT(m.maintain_id) AS total
@@ -32,5 +40,4 @@ public interface MaintainRepository extends JpaRepository<Maintain, Long> {
         ORDER BY month
     """, nativeQuery = true)
     List<Object[]> countRequestsLast12Months();
-
 }

@@ -6,6 +6,7 @@ import { pageSize as defaultPageSize } from "../config_variable";
 import * as bootstrap from "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
+import useMessage from "../component/useMessage";
 
 /* ========= API via fetch ========= */
 const API_BASE = import.meta.env?.VITE_API_URL || "http://localhost:8080";
@@ -173,6 +174,8 @@ function PackageManagement() {
   const [contractTypes, setContractTypes] = useState([]); // [{id,name,months}]
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const { showMessageSave, showMessageError, showMessageConfirmDelete } = useMessage();
+
 
   // ฟอร์มสร้างใหม่ (เลือกจาก contractType)
   const [newPkg, setNewPkg] = useState({
@@ -395,17 +398,24 @@ function PackageManagement() {
 
       await API.createPackage(payload);
 
-      // ✅ ปิด modal แบบชัวร์ (รอให้ fade-out เสร็จ)
+      // ✅ ปิด modal แบบชัวร์
       closeModalSafely("createPackageModal");
 
-      // ✅ ดึงข้อมูลใหม่หลัง modal ปิด
+      // ✅ แจ้งเตือน SweetAlert เมื่อสร้างสำเร็จ
+      showMessageSave("สร้าง Package สำเร็จ!");
+
+      // ✅ โหลดข้อมูลใหม่หลังจากแจ้งเตือน
       setTimeout(() => {
         fetchPackages();
       }, 250);
 
+      // ✅ รีเซ็ตค่า form
       setNewPkg((p) => ({ ...p, rent: 5000, active: true }));
     } catch (e) {
       console.error("createPackage error:", e);
+
+      // ❌ แจ้งเตือน SweetAlert กรณี error
+      showMessageError("เกิดข้อผิดพลาดในการสร้าง Package");
     } finally {
       setSaving(false);
     }

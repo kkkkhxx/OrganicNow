@@ -10,7 +10,7 @@ import java.util.List;
 
 public interface AssetRepository extends JpaRepository<Asset, Long> {
 
-    // Get assets by roomId
+    // ✅ สินค้าของห้อง (ไม่เอา deleted)
     @Query("""
            SELECT new com.organicnow.backend.dto.AssetDto(
                a.id, a.assetName, ag.assetGroupName, r.roomFloor, r.roomNumber
@@ -20,10 +20,11 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
            JOIN RoomAsset ra ON a.id = ra.asset.id
            JOIN ra.room r
            WHERE r.id = :roomId
+             AND a.status <> 'deleted'
            """)
     List<AssetDto> findAssetsByRoomId(@Param("roomId") Long roomId);
 
-    // Get all assets (with group + room info)
+    // ✅ ดูสินค้าทั้งหมด (ไม่เอา deleted)
     @Query("""
            SELECT new com.organicnow.backend.dto.AssetDto(
                a.id, a.assetName, ag.assetGroupName, r.roomFloor, r.roomNumber
@@ -32,9 +33,29 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
            JOIN a.assetGroup ag
            LEFT JOIN RoomAsset ra ON a.id = ra.asset.id
            LEFT JOIN ra.room r
+           WHERE a.status <> 'deleted'
            """)
     List<AssetDto> findAllAssetOptions();
 
-    // หา assets ของ group
+    // ✅ เลือกเฉพาะของว่าง (available) ตาม id
+    @Query("""
+           SELECT a FROM Asset a
+           WHERE a.id = :assetId AND a.status = 'available'
+           """)
+    Asset findAvailableById(@Param("assetId") Long assetId);
+
+    // ✅ ใช้ใน AssetGroupService
     List<Asset> findByAssetGroupId(Long assetGroupId);
+
+    // ✅ ดึงเฉพาะ asset ที่ยังไม่ถูกใช้ และสถานะยัง available
+    @Query("""
+        SELECT new com.organicnow.backend.dto.AssetDto(
+            a.id, a.assetName, ag.assetGroupName, null, null
+        )
+        FROM Asset a
+        JOIN a.assetGroup ag
+        WHERE a.status = 'available'
+          AND a.id NOT IN (SELECT ra.asset.id FROM RoomAsset ra)
+        """)
+    List<AssetDto> findAvailableAssets();
 }
