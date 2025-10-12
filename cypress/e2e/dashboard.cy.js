@@ -110,26 +110,46 @@ describe('E2E Test for Dashboard', () => {
     });
 
     // Summary check
-    it('should display room status summary with correct counts', () => {
-        cy.visit('/');
-        cy.wait('@getDashboard');
+  it('should display room status summary with correct counts', () => {
+    cy.visit('/');
+    cy.wait('@getDashboard');
 
-        const available = mockResponse.rooms.filter(r => r.status === 0).length;
-        const unavailable = mockResponse.rooms.filter(r => r.status === 1).length;
-        const repair = mockResponse.rooms.filter(r => r.status === 2).length;
+    const available = mockResponse.rooms.filter(r => r.status === 0).length;
+    const unavailable = mockResponse.rooms.filter(r => r.status === 1).length;
+    const repair = mockResponse.rooms.filter(r => r.status === 2).length;
 
-        cy.contains('Summary').should('be.visible');
+    // ✅ เจาะจงหา card Summary โดยใช้ text ของมัน
+    cy.contains('h5.card-title', 'Summary').should('be.visible');
 
-        cy.get('.text-success').invoke('text').then(text => {
-            expect(parseInt(text)).to.equal(available);
-        });
-        cy.get('.text-danger').invoke('text').then(text => {
-            expect(parseInt(text)).to.equal(unavailable);
-        });
-        cy.get('.text-warning').invoke('text').then(text => {
-            expect(parseInt(text)).to.equal(repair);
-        });
-    });
+    // ✅ ใช้ within จำกัดขอบเขต selector ให้แค่ใน Summary card
+    cy.contains('h5.card-title', 'Summary')
+      .parents('.card')
+      .within(() => {
+        // Available
+        cy.get('.text-success', { timeout: 8000 })
+          .should('not.contain', '0') // รอให้ React อัปเดตจริง
+          .invoke('text')
+          .then(text => {
+            expect(parseInt(text.trim())).to.equal(available);
+          });
+
+        // Unavailable
+        cy.get('.text-danger', { timeout: 8000 })
+          .should('not.contain', '0')
+          .invoke('text')
+          .then(text => {
+            expect(parseInt(text.trim())).to.equal(unavailable);
+          });
+
+        // Repair
+        cy.get('.text-warning', { timeout: 8000 })
+          .should('not.contain', '0')
+          .invoke('text')
+          .then(text => {
+            expect(parseInt(text.trim())).to.equal(repair);
+          });
+      });
+  });
 
     // Responsive test
     it('should display correctly on mobile viewport', () => {
