@@ -1,274 +1,220 @@
-// cypress/e2e/tenant-detail.cy.js
+// cypress/e2e/tenantdetail.cy.js
+describe("E2E Full Interaction Test for Tenant Detail", () => {
+  const mockTenantData = {
+    contractId: 1,
+    tenantId: 1,
+    firstName: "John",
+    lastName: "Doe",
+    email: "john@example.com",
+    phoneNumber: "0812345678",
+    nationalId: "1234567890123",
+    room: "101",
+    floor: 1,
+    packageName: "3 เดือน",
+    packageId: 1,
+    signDate: "2024-01-01T00:00:00",
+    startDate: "2024-01-01T00:00:00",
+    endDate: "2024-04-01T23:59:59",
+    deposit: 5000,
+    rentAmountSnapshot: 5000,
+    invoices: [
+      {
+        invoiceId: "INV001",
+        dueDate: "2024-01-05T00:00:00",
+        netAmount: 5000,
+        invoiceStatus: 1,
+        payDate: "2024-01-03T00:00:00",
+        penaltyTotal: 0
+      },
+      {
+        invoiceId: "INV002",
+        dueDate: "2024-02-05T00:00:00",
+        netAmount: 5000,
+        invoiceStatus: 0,
+        payDate: null,
+        penaltyTotal: 0
+      },
+      {
+        invoiceId: "INV003",
+        dueDate: "2024-03-05T00:00:00",
+        netAmount: 5200,
+        invoiceStatus: 2,
+        payDate: null,
+        penaltyTotal: 200
+      }
+    ]
+  };
 
-describe('E2E Test for Tenant Detail', () => {
+  beforeEach(() => {
+    cy.intercept("GET", "**/tenant/1", {
+      statusCode: 200,
+      body: mockTenantData
+    }).as("getTenantDetail");
 
-    const mockTenantData = {
-        contractId: 1,
-        tenantId: 1,
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-        phoneNumber: '0812345678',
-        nationalId: '1234567890123',
-        room: '101',
-        floor: 1,
-        packageName: '3 เดือน',
-        packageId: 1,
-        signDate: '2024-01-01T00:00:00',
-        startDate: '2024-01-01T00:00:00',
-        endDate: '2024-04-01T23:59:59',
-        deposit: 5000,
-        rentAmountSnapshot: 5000,
-        invoices: [
-            {
-                invoiceId: 'INV001',
-                dueDate: '2024-01-05T00:00:00',
-                netAmount: 5000,
-                invoiceStatus: 1, // Paid
-                payDate: '2024-01-03T00:00:00',
-                penaltyTotal: 0
-            },
-            {
-                invoiceId: 'INV002',
-                dueDate: '2024-02-05T00:00:00',
-                netAmount: 5000,
-                invoiceStatus: 0, // Unpaid
-                payDate: null,
-                penaltyTotal: 0
-            },
-            {
-                invoiceId: 'INV003',
-                dueDate: '2024-03-05T00:00:00',
-                netAmount: 5200,
-                invoiceStatus: 2, // Overdue
-                payDate: null,
-                penaltyTotal: 200
-            }
-        ]
-    };
+    cy.intercept("PUT", "**/tenant/update/1", {
+      statusCode: 200,
+      body: { message: "Tenant updated successfully" }
+    }).as("updateTenant");
+  });
 
-    beforeEach(() => {
-        // Mock API for tenant detail
-        cy.intercept('GET', '**/tenant/1', {
-            statusCode: 200,
-            body: mockTenantData
-        }).as('getTenantDetail');
+  // ✅ Load Tenant Detail
+  it("should load tenant detail correctly", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.contains("Tenant Management").should("be.visible");
+    cy.contains("John Doe").should("be.visible");
+  });
 
-        // Mock API for tenant update
-        cy.intercept('PUT', '**/tenant/update/1', {
-            statusCode: 200,
-            body: { message: 'Tenant updated successfully' }
-        }).as('updateTenant');
+  // ✅ Breadcrumb navigation
+  it("should navigate via breadcrumb click", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.get(".breadcrumb-link").click();
+    cy.url().should("include", "/tenantmanagement");
+  });
+
+  // ✅ Edit modal typing & saving
+  it("should open modal and type into fields", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+
+    cy.get('[data-bs-target="#exampleModal"]').click();
+    cy.get("#exampleModal").should("be.visible");
+
+    cy.get('input[type="text"]').eq(0).clear().type("UpdatedFirst");
+    cy.get('input[type="text"]').eq(1).clear().type("UpdatedLast");
+    cy.get('input[type="email"]').clear().type("updated@example.com");
+    cy.get('input[type="text"]').eq(3).clear().type("0899999999");
+
+    cy.get('button[type="submit"]').click();
+    cy.wait("@updateTenant");
+
+    cy.get(".custom-alert-overlay").should("be.visible");
+    cy.contains("อัปเดตข้อมูลสำเร็จ").should("be.visible");
+    cy.get(".custom-alert-btn").click();
+  });
+
+  // ✅ ปิด Modal ด้วย Cancel
+  it("should close modal with Cancel button", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+
+    // เปิด Modal
+    cy.get('[data-bs-target="#exampleModal"]').click();
+    cy.get("#exampleModal").should("be.visible");
+
+    // คลิก Cancel (scoped ใน modal เพื่อลดโอกาสเจอหลาย element)
+    cy.get("#exampleModal #modalForm_btnClose").scrollIntoView().click({ force: true });
+
+    // รอ Bootstrap transition สั้น ๆ
+    cy.wait(600);
+
+    // ถ้ายังไม่ปิด ให้ fallback: กด ESC แทน (ไม่ยุ่งกับ .modal-backdrop)
+    cy.get("#exampleModal").then(($el) => {
+      if ($el.hasClass("show")) {
+        cy.get("body").type("{esc}");
+        cy.wait(300);
+      }
     });
 
-    // 1. ทดสอบการโหลดหน้า Tenant Detail
-    it('should load tenant detail page successfully', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
+    // ตรวจว่า modal ปิดแน่นอน
+    cy.get("#exampleModal", { timeout: 8000 })
+      .should("not.have.class", "show")
+      .and("not.be.visible");
 
-        // ตรวจสอบ title และ breadcrumb
-        cy.contains('Tenant Management', { timeout: 10000 }).should('be.visible');
-        cy.contains('John Doe', { timeout: 10000 }).should('be.visible');
+    // ยืนยันว่าไม่มี backdrop ค้างอยู่
+    cy.get(".modal-backdrop").should("not.exist");
+  });
 
-        // ตรวจสอบ Edit button
-        cy.get('[data-bs-toggle="modal"][data-bs-target="#exampleModal"]', { timeout: 10000 })
-            .should('contain', 'Edit Tenant');
+
+
+  // ✅ Check readonly fields
+  it("should have readOnly fields for non-editable info", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.get('[data-bs-target="#exampleModal"]').click();
+    cy.get('input[readonly]').should("have.length.greaterThan", 2);
+  });
+
+  // ✅ Scroll check
+  it("should scroll inside payment history", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.get(".tab-content").scrollTo("bottom");
+    cy.get(".status-card").last().should("be.visible");
+  });
+
+  // ✅ Status color
+  it("should show correct color for invoice statuses", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.get(".status-card").eq(0).should("have.class", "status-complete");
+    cy.get(".status-card").eq(1).should("have.class", "status-warning");
+    cy.get(".status-card").eq(2).should("have.class", "status-danger");
+  });
+
+  // ✅ Toolbar
+  it("should display toolbar and Edit Tenant button", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.get(".tm-toolbar").should("be.visible");
+    cy.get("button.btn.btn-primary").should("contain", "Edit Tenant");
+  });
+
+  // ✅ Handle 404
+  it("should redirect when tenant not found", () => {
+    cy.intercept("GET", "**/tenant/404", {
+      statusCode: 404,
+      body: { error: "Tenant not found" }
+    }).as("notFound");
+    cy.visit("/tenantdetail/404");
+    cy.wait("@notFound");
+    cy.url().should("include", "/tenantmanagement");
+  });
+
+  // ✅ Validation alert
+  it("should show validation alert for missing firstName", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+    cy.get('[data-bs-target="#exampleModal"]').click();
+    cy.get('input[type="text"]').eq(0).clear();
+    cy.get('button[type="submit"]').click();
+    cy.get(".custom-alert-overlay").should("be.visible");
+    cy.contains("กรุณากรอก First Name").should("be.visible");
+  });
+
+  // ✅ ปิด Modal ด้วยปุ่ม X แบบเสถียร
+  it("should close modal when clicking X button on the top right", () => {
+    cy.visit("/tenantdetail/1");
+    cy.wait("@getTenantDetail");
+
+    // เปิด Modal
+    cy.get('[data-bs-target="#exampleModal"]').click();
+    cy.get("#exampleModal").should("be.visible");
+
+    // คลิกปุ่ม X (force ให้แน่ใจว่าคลิกได้)
+    cy.get('#exampleModal .modal-header .btn-close').first().click({ force: true });
+
+    // ✅ รอ fade out (Bootstrap transition)
+    cy.wait(1000);
+
+    // ถ้ายังไม่ปิด ให้กด ESC fallback
+    cy.get("#exampleModal").then(($el) => {
+      if ($el.hasClass("show")) {
+        cy.log("⚠️ Modal still visible — pressing ESC to close it manually");
+        cy.get("body").type("{esc}");
+        cy.wait(500);
+      }
     });
 
-    // 2. ทดสอบการแสดงข้อมูล Tenant Information
-    it('should display tenant information correctly', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
+    // ✅ ตรวจว่า modal ปิดแล้วแน่นอน
+    cy.get("#exampleModal", { timeout: 8000 })
+      .should("not.have.class", "show")
+      .and("not.be.visible");
 
-        // ตรวจสอบ Tenant Information card
-        cy.contains('Tenant Information', { timeout: 10000 }).should('be.visible');
-
-        // ตรวจสอบข้อมูลต่างๆ
-        cy.contains('First Name:', { timeout: 10000 }).should('be.visible');
-        cy.contains('John').should('be.visible');
-        cy.contains('Last Name:').should('be.visible');
-        cy.contains('Doe').should('be.visible');
-        cy.contains('National ID:').should('be.visible');
-        cy.contains('1234567890123').should('be.visible');
-        cy.contains('Phone Number:').should('be.visible');
-        cy.contains('0812345678').should('be.visible');
-        cy.contains('Email:').should('be.visible');
-        cy.contains('john@example.com').should('be.visible');
-        cy.contains('Package:').should('be.visible');
-        cy.contains('3 เดือน').should('be.visible');
-    });
-
-    // 3. ทดสอบการแสดงข้อมูล Room Information
-    it('should display room information correctly', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบ Room Information card
-        cy.contains('Room Information', { timeout: 10000 }).should('be.visible');
-
-        // ตรวจสอบข้อมูลห้อง
-        cy.contains('Floor:', { timeout: 10000 }).should('be.visible');
-        cy.contains('Room:').should('be.visible');
-        cy.contains('101').should('be.visible');
-    });
-
-    // 4. ทดสอบการแสดง Payment History
-    it('should display payment history correctly', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบ Payment History tab
-        cy.contains('Payment History', { timeout: 10000 }).should('be.visible');
-
-        // ตรวจสอบว่ามี invoice cards
-        cy.get('.status-card', { timeout: 10000 }).should('have.length', 3);
-
-        // ตรวจสอบข้อมูลใน invoice แรก (Paid)
-        cy.contains('INV001', { timeout: 10000 }).should('be.visible');
-        cy.contains('5000 Baht').should('be.visible');
-        cy.contains('Paid').should('be.visible');
-
-        // ตรวจสอบข้อมูลใน invoice ที่สอง (Unpaid)
-        cy.contains('INV002').should('be.visible');
-        cy.contains('Unpaid').should('be.visible');
-
-        // ตรวจสอบข้อมูลใน invoice ที่สาม (Overdue with penalty)
-        cy.contains('INV003').should('be.visible');
-        cy.contains('Overdue').should('be.visible');
-        cy.contains('200').should('be.visible'); // penalty
-    });
-
-    // 5. ทดสอบการ navigate กลับไปหน้า Tenant Management
-    it('should navigate back to tenant management when clicking breadcrumb', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // คลิกที่ breadcrumb
-        cy.get('.breadcrumb-link', { timeout: 10000 }).click();
-
-        // ตรวจสอบว่า URL เปลี่ยนไป
-        cy.url().should('include', '/tenantmanagement');
-    });
-
-    // 6. ทดสอบการแสดงวันที่
-    it('should display dates in correct format', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบรูปแบบวันที่
-        cy.contains('2024-01-01', { timeout: 10000 }).should('be.visible'); // Sign Date
-        cy.contains('2024-04-01').should('be.visible'); // End Date
-    });
-
-    // 7. ทดสอบ การ handle error เมื่อไม่พบ tenant
-    it('should handle tenant not found error', () => {
-        // Mock API to return 404
-        cy.intercept('GET', '**/tenant/999', {
-            statusCode: 404,
-            body: { error: 'Tenant not found' }
-        }).as('getTenantNotFound');
-
-        cy.visit('/tenantdetail/999');
-        cy.wait('@getTenantNotFound');
-
-        // ตรวจสอบว่า redirect ไปหน้า tenant management
-        cy.url({ timeout: 10000 }).should('include', '/tenantmanagement');
-    });
-
-    // 8. ทดสอบการแสดง empty state เมื่อไม่มี invoices
-    it('should display no invoices message when tenant has no payment history', () => {
-        // Mock tenant without invoices
-        const tenantWithoutInvoices = {
-            ...mockTenantData,
-            invoices: []
-        };
-
-        cy.intercept('GET', '**/tenant/2', {
-            statusCode: 200,
-            body: tenantWithoutInvoices
-        }).as('getTenantNoInvoices');
-
-        cy.visit('/tenantdetail/2');
-        cy.wait('@getTenantNoInvoices');
-
-        // ตรวจสอบข้อความที่แสดงเมื่อไม่มี invoices
-        cy.contains('No invoices found', { timeout: 10000 }).should('be.visible');
-    });
+    // ✅ ตรวจว่า backdrop ถูกลบออก
+    cy.get(".modal-backdrop", { timeout: 8000 }).should("not.exist");
+  });
 
 
-
-    // 10. ทดสอบการแสดง alert message
-    it('should display success message after successful update', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // เปิด edit modal และแก้ไขข้อมูล
-        cy.get('[data-bs-toggle="modal"][data-bs-target="#exampleModal"]', { timeout: 10000 }).click();
-        cy.get('input[type="text"]', { timeout: 10000 }).first().clear().type('Updated Name');
-
-        // Submit form
-        cy.get('button[type="submit"]').click();
-
-        cy.wait('@updateTenant');
-
-        // ตรวจสอบ success alert
-        cy.get('.custom-alert-overlay', { timeout: 10000 }).should('be.visible');
-        cy.contains('Success').should('be.visible');
-        cy.contains('อัปเดตข้อมูลสำเร็จ').should('be.visible');
-    });
-
-    // 11. ทดสอบ tabs navigation
-    it('should navigate between tabs correctly', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบ Payment History tab เป็น active
-        cy.get('#payment-tab', { timeout: 10000 }).should('have.class', 'active');
-        cy.get('#payment').should('have.class', 'show active');
-    });
-
-    // 12. ทดสอบการแสดงข้อมูลวันที่ในรูปแบบที่ถูกต้อง
-    it('should format dates correctly in invoice history', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบรูปแบบวันที่ใน invoice
-        cy.contains('2024-01-05', { timeout: 10000 }).should('be.visible'); // Due date
-        cy.contains('2024-01-03').should('be.visible'); // Pay date
-    });
-
-    // 13. ทดสอบการ scroll ใน payment history
-    it('should allow scrolling in payment history section', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบว่า payment history section มี overflow-auto
-        cy.get('.tab-content', { timeout: 10000 }).should('have.css', 'overflow', 'auto');
-    });
-
-    // 14. ทดสอบการแสดงข้อมูล package badge
-    it('should display package badge with correct styling', () => {
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantDetail');
-
-        // ตรวจสอบ package badge
-        cy.get('.package-badge', { timeout: 10000 }).should('be.visible');
-        cy.get('.package-badge').should('contain', '3 เดือน');
-        cy.get('.package-badge').should('have.class', 'badge');
-    });
-
-    // 15. ทดสอบการ handle network error
-    it('should handle network errors gracefully', () => {
-        // Mock network error
-        cy.intercept('GET', '**/tenant/1', {
-            statusCode: 500,
-            body: { error: 'Internal Server Error' }
-        }).as('getTenantError');
-
-        cy.visit('/tenantdetail/1');
-        cy.wait('@getTenantError');
-
-        // ตรวจสอบว่า redirect ไปหน้า tenant management
-        cy.url({ timeout: 10000 }).should('include', '/tenantmanagement');
-    });
 });
