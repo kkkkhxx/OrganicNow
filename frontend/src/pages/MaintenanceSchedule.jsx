@@ -8,88 +8,160 @@ import * as bootstrap from "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
-// ===== API config =====
+// ===== API base =====
 const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080";
-const SCHEDULE_API = {
-  LIST: `${API_BASE}/maintain-schedule/list`,
-  CREATE: `${API_BASE}/maintain-schedule/create`,
-  DELETE: (id) => `${API_BASE}/maintain-schedule/${id}`,
+
+// ===== Helpers =====
+const addMonthsISO = (isoDate, months) => {
+    if (!isoDate) return "";
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    dt.setMonth(dt.getMonth() + Number(months || 0));
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
 };
 
-// ===== Helper: บวกเดือนให้กับวันที่ (yyyy-mm-dd) =====
-function addMonthsISO(isoDate, months) {
-  if (!isoDate) return "";
-  const [y, m, d] = isoDate.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  dt.setMonth(dt.getMonth() + Number(months || 0));
-  const yyyy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
+// yyyy-mm-dd -> yyyy-mm-ddTHH:MM:SS
+const d2ldt = (d) => (d ? `${d}T00:00:00` : null);
 
-// ===== Helper: แปลงข้อมูลจาก API -> รูปแบบตารางหน้า UI นี้ =====
-// ปรับ mapping ตรงนี้ให้ตรงกับ backend ของคุณได้
+// ===== Endpoints ตาม Controller: @RequestMapping("/schedules") =====
+const SCHEDULE_API = {
+    LIST: `${API_BASE}/schedules`,                 // GET -> { result, assetGroupDropdown }
+    CREATE: `${API_BASE}/schedules`,               // POST
+    DELETE: (id) => `${API_BASE}/schedules/${id}`, // DELETE
+    DONE: (id) => `${API_BASE}/schedules/${id}/done`, // (ถ้าใช้)
+};
+
+// ===== Mapping: API -> แถวบนตาราง =====
 function fromApi(item) {
-  // ตัวอย่างสมมติ: {id, scope(0=Asset,1=Building), assetName, cycleMonths, notifyDays, lastDate, nextDate}
-  const scope = item.scope === 0 || item.scope === "ASSET" ? "Asset" : "Building";
-  const lastDate = item.lastDate ? String(item.lastDate).slice(0, 10) : "";
-  const cycle = Number(item.cycleMonths ?? item.cycle ?? 0);
-  const nextDate =
-    (item.nextDate && String(item.nextDate).slice(0, 10)) ||
-    (lastDate && cycle ? addMonthsISO(lastDate, cycle) : "");
-  return {
-    id: item.id,
-    scope,
-    asset: item.assetName ?? item.asset ?? "-",
-    cycle,
-    notify: Number(item.notifyDays ?? item.notify ?? 0),
-    lastDate,
-    nextDate,
-  };
+    const rawScope = item.scope ?? item.scopeType ?? item.targetScope;
+    const scope = rawScope === 0 || rawScope === "ASSET" || rawScope === "Asset" ? "Asset" : "Building";
+
+    const lastDate =
+        item.lastDate
+            ? String(item.lastDate).slice(0, 10)
+            : (item.lastMaintenanceDate ? String(item.lastMaintenanceDate).slice(0, 10) : "");
+
+    const cycle = Number(item.cycleMonths ?? item.cycle ?? item.cycleMonth ?? 0);
+
+    const nextFromApi =
+        (item.nextDate && String(item.nextDate).slice(0, 10)) ||
+        (item.nextMaintenanceDate && String(item.nextMaintenanceDate).slice(0, 10));
+
+    const nextDate = nextFromApi || (lastDate && cycle ? addMonthsISO(lastDate, cycle) : "");
+
+    const name = item.assetName ?? item.targetName ?? "-";
+
+    return {
+        id: item.id ?? item.scheduleId ?? item.maintenanceScheduleId,
+        scope,
+        target: name,   // ใช้ภายใน logic
+        asset: name,    // <-- เพิ่มเพื่อให้ UI เดิมที่แสดง item.asset ทำงานได้เลย
+        cycle,
+        notify: Number(item.notifyDays ?? item.notify ?? item.notifyDay ?? 0),
+        lastDate,
+        nextDate,
+    };
 }
 
-// ===== Helper: สร้าง payload สำหรับ POST =====
-function toCreatePayload(newSch) {
-  return {
-    // หาก backend ใช้ enum/ตัวเลข: 0=Asset, 1=Building
-    scope: newSch.scope === "Asset" ? 0 : 1,
-    assetName: newSch.asset,
-    cycleMonths: Number(newSch.cycle),
-    notifyDays: Number(newSch.notify),
-    // ส่งเป็น LocalDateTime ถ้า backend ต้องการ
-    lastDate: newSch.lastDate ? `${newSch.lastDate}T00:00:00` : null,
-  };
+// ===== Mapping: ฟอร์ม -> payload สำหรับ POST =====
+function toCreatePayload(f) {
+    const targetName = f.target || f.asset || ""; // รองรับทั้งสองเคสโดยไม่ต้องเปลี่ยน UI
+    return {
+        scope: f.scope === "Asset" ? 0 : 1,
+        assetName: targetName,
+        cycleMonths: Number(f.cycle),
+        notifyDays: Number(f.notify),
+        lastDate: d2ldt(f.lastDate),
+    };
+}
+
+// ดึง asset สำหรับ dropdown (เลือก source: 'available' | 'all' | 'room', ถ้า room ต้องส่ง roomId)
+async function fetchAssetDropdown({ source = "available", roomId = null } = {}) {
+    try {
+        setAssetError(null);
+        setAssetLoading(true);
+
+        let url = "";
+        if (source === "room" && roomId != null) {
+            url = `${API_BASE}/assets/${roomId}`;
+        } else if (source === "all") {
+            url = `${API_BASE}/assets/all`;
+        } else {
+            url = `${API_BASE}/assets/available`;
+        }
+
+        const res = await fetch(url, { credentials: "include" });
+        if (!res.ok) throw new Error(await res.text());
+        const json = await res.json();
+
+        // AssetController คืนเป็น ApiResponse<T>
+        // โครงทั่วไป: { "message": "...", "data": [...] } หรือ { "status": "...", "data": [...] }
+        const arr = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+
+        const opts = arr.map((a) => ({
+            id: a.id ?? a.assetId ?? a.code ?? String(Math.random()),
+            name: a.name ?? a.assetName ?? a.displayName ?? `Asset #${a.id ?? ""}`,
+        }));
+
+        setAssetOptions(opts);
+    } catch (e) {
+        console.error(e);
+        setAssetError("โหลดรายการ Asset ไม่สำเร็จ");
+        setAssetOptions([]);
+    } finally {
+        setAssetLoading(false);
+    }
 }
 
 function MaintenanceSchedule() {
-  // --------- DATA (จาก backend) ----------
-  const [schedules, setSchedules] = useState([]); // <— ไม่มี mock แล้ว
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+    // --------- DATA (จาก backend) ----------
+    const [schedules, setSchedules] = useState([]);   // ถ้าไฟล์เดิมใช้ชื่อ rows ให้คงชื่อ rows แล้ว map ให้ตรงใช้
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
-  const loadSchedules = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const res = await fetch(SCHEDULE_API.LIST, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      const json = await res.json();
-      // json ควรเป็น array
-      const rows = Array.isArray(json) ? json.map(fromApi) : [];
-      setSchedules(rows);
-    } catch (e) {
-      console.error(e);
-      setError("โหลดตาราง Maintenance Schedule ไม่สำเร็จ");
-      setSchedules([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+// รายการ asset สำหรับ dropdown ใน Modal (ใช้จาก response เดียวกัน)
+    const [assetOptions, setAssetOptions] = useState([]);
+    const [assetLoading, setAssetLoading] = useState(false);
+    const [assetError, setAssetError] = useState(null);
 
-  useEffect(() => {
-    loadSchedules();
-  }, []);
+    // ===== โหลดตารางจาก /schedules (GET) =====
+    const loadSchedules = async () => {
+        try {
+            setLoading(true);
+            setError("");
+            const res = await fetch(SCHEDULE_API.LIST, { credentials: "include" });
+            if (!res.ok) throw new Error(await res.text());
+
+            // backend คืน MaintenanceScheduleResponse { result: [...], assetGroupDropdown: [...] }
+            const json = await res.json();
+            const list = Array.isArray(json?.result) ? json.result : [];
+            const rows = list.map(fromApi);
+            setSchedules(rows);
+
+            // เติม asset dropdown จาก response เดียวกัน
+            if (Array.isArray(json?.assetGroupDropdown)) {
+                const opts = json.assetGroupDropdown.map((x) => ({
+                    id: x.id ?? x.groupId ?? x.code ?? String(Math.random()),
+                    name: x.name ?? x.groupName ?? x.displayName ?? "Unnamed",
+                }));
+                setAssetOptions(opts);
+            }
+        } catch (e) {
+            console.error(e);
+            setError("โหลดตาราง Maintenance Schedule ไม่สำเร็จ");
+            setSchedules([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadSchedules();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
   // --------- TABLE CONTROLS ----------
   const [search, setSearch] = useState("");
@@ -105,41 +177,37 @@ function MaintenanceSchedule() {
     dateTo: "",
   });
 
-  // ---- สถานะกำลังบันทึก ----
-  const [saving, setSaving] = useState(false);
+// ===== สร้างรายการ (POST /schedules) =====
+    const [saving, setSaving] = useState(false);
+    const [newSch, setNewSch] = useState({
+        scope: "",
+        target: "",
+        cycle: "",
+        notify: "",
+        lastDate: new Date().toISOString().slice(0, 10),
+    });
 
-  // (ออปชัน) validate เบื้องต้น
-  const [newSch, setNewSch] = useState({
-    scope: "",
-    asset: "",
-    cycle: "",
-    notify: "",
-    lastDate: new Date().toISOString().slice(0, 10),
-  });
-
-  const validateNewSch = () => {
-    if (newSch.scope === "Asset") {
-      if (!newSch.asset?.trim()) return "กรุณาเลือก Asset";
-    } else {
-      if (!newSch.asset?.trim()) return "กรุณากรอก Target";
-    }
-    if (!newSch.cycle || newSch.cycle < 1) return "Cycle ต้องเป็นตัวเลขตั้งแต่ 1 เดือนขึ้นไป";
-    if (newSch.notify < 0) return "Notify ต้องไม่ติดลบ";
-    return null;
-  };
+    const validateNewSch = () => {
+        if (!newSch.scope) return "กรุณาเลือก Scope";
+        if (!newSch.target?.trim()) return "กรุณากรอก Target";
+        if (!newSch.cycle || Number(newSch.cycle) < 1) return "Cycle ต้อง ≥ 1";
+        if (newSch.notify === "" || Number(newSch.notify) < 0) return "Notify ต้อง ≥ 0";
+        if (!newSch.lastDate) return "กรุณาเลือก Last date";
+        return null;
+    };
 
   // ---- CREATE (POST) -> reload ----
-  const addSchedule = async () => {
-    const payload = toCreatePayload(newSch);
-    const res = await fetch(SCHEDULE_API.CREATE, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    await loadSchedules();
-  };
+    const addSchedule = async () => {
+        const payload = toCreatePayload(newSch);
+        const res = await fetch(SCHEDULE_API.CREATE, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        await loadSchedules();
+    };
 
   const clearFilters = () =>
     setFilters({
@@ -214,24 +282,23 @@ function MaintenanceSchedule() {
     else setSelected(pageRows.map((r) => r.id));
   };
 
-  // --------- ACTIONS ----------
-  const deleteRow = async (rowId) => {
-    if (!confirm("ลบรายการนี้ใช่หรือไม่?")) return;
-    try {
-      const res = await fetch(SCHEDULE_API.DELETE(rowId), {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      await loadSchedules();
-      setSelected((prev) => prev.filter((id) => id !== rowId));
-    } catch (e) {
-      console.error(e);
-      alert("ลบไม่สำเร็จ");
-    }
-  };
+    // ===== ลบรายการ (DELETE /schedules/{id}) =====
+    const deleteRow = async (rowId) => {
+        if (!confirm("ลบรายการนี้ใช่หรือไม่?")) return;
+        try {
+            const res = await fetch(SCHEDULE_API.DELETE(rowId), {
+                method: "DELETE",
+                credentials: "include",
+            });
+            if (!res.ok) throw new Error(await res.text());
+            await loadSchedules();
+        } catch (e) {
+            console.error(e);
+            alert("ลบไม่สำเร็จ");
+        }
+    };
 
-  const deleteSelected = async () => {
+    const deleteSelected = async () => {
     if (selected.length === 0) return;
     if (!confirm(`ลบ ${selected.length} รายการ?`)) return;
     try {
@@ -265,48 +332,22 @@ function MaintenanceSchedule() {
     document.body.style.removeProperty("paddingRight");
   };
 
-  // รายการ asset (mock loader — ถ้าพร้อม API จริงก็เปลี่ยน fetch ที่นี่ได้)
-  const [assetOptions, setAssetOptions] = useState([]);
-  const [assetLoading, setAssetLoading] = useState(false);
-  const [assetError, setAssetError] = useState(null);
+    const loadAssets = async () => {
+        // ตอนนี้เราดึงจาก /schedules แล้ว ไม่มี endpoint แยก
+        setAssetError(null);
+        setAssetLoading(false);
+    };
 
-  const loadAssets = async () => {
-    try {
-      setAssetError(null);
-      setAssetLoading(true);
-      // MOCK
-      const mock = [
-        { id: "AST-001", name: "Air Conditioner - Lobby" },
-        { id: "AST-002", name: "Elevator - A" },
-        { id: "AST-003", name: "Generator - West Wing" },
-        { id: "AST-004", name: "Water Pump - B1" },
-      ];
-      await new Promise((r) => setTimeout(r, 300));
-      setAssetOptions(mock);
+    // เดิมของคุณ
+    useEffect(() => {
+        if (newSch.scope === "Asset") {
+            fetchAssetDropdown({ source: "available" });
+            setNewSch((p) => ({ ...p, asset: "" }));
+        }
+    }, [newSch.scope]);
 
-      // ถ้าต้องการเชื่อมจริง:
-      // const res = await fetch(`${API_BASE}/assets?active=true`, {credentials:'include'});
-      // if (!res.ok) throw new Error(await res.text());
-      // const data = await res.json(); // [{id, name}]
-      // setAssetOptions(data);
 
-    } catch (e) {
-      console.error(e);
-      setAssetError("โหลดรายการ Asset ไม่สำเร็จ");
-    } finally {
-      setAssetLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (newSch.scope === "Asset") {
-      loadAssets();
-      setNewSch((p) => ({ ...p, asset: "" }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newSch.scope]);
-
-  const hasAnyFilter =
+    const hasAnyFilter =
     filters.scope !== "ALL" ||
     filters.cycleMin !== "" ||
     filters.cycleMax !== "" ||
@@ -366,15 +407,6 @@ function MaintenanceSchedule() {
                   </div>
 
                   <div className="d-flex align-items-center gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
-                      onClick={loadSchedules}
-                      disabled={loading}
-                    >
-                      <i className="bi bi-arrow-clockwise me-1" />
-                      Refresh
-                    </button>
                     <button
                       type="button"
                       className="btn btn-primary"

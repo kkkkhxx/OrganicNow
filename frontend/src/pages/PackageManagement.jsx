@@ -318,20 +318,6 @@ function PackageManagement() {
         return false;
       if (filters.rentMax !== "" && p.rent > Number(filters.rentMax))
         return false;
-      if (
-        filters.dateFrom &&
-        p.createDate &&
-        p.createDate !== "-" &&
-        p.createDate < filters.dateFrom
-      )
-        return false;
-      if (
-        filters.dateTo &&
-        p.createDate &&
-        p.createDate !== "-" &&
-        p.createDate > filters.dateTo
-      )
-        return false;
       return true;
     });
 
@@ -790,29 +776,6 @@ function PackageManagement() {
                   setFilters((f) => ({ ...f, rentMax: e.target.value }))
                 }
                 placeholder="e.g. 6000"
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label">Create date from</label>
-              <input
-                type="date"
-                className="form-control"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }))
-                }
-              />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Create date to</label>
-              <input
-                type="date"
-                className="form-control"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }))
-                }
               />
             </div>
 
