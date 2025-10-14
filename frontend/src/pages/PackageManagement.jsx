@@ -515,51 +515,42 @@ function PackageManagement() {
             )}
 
             {/* Table */}
-            <div className="table-wrapper mt-3">
-              <table className="table text-nowrap">
+            <div className="table-wrapper mt-3" style={{ overflowX: 'auto' }}>
+              <table className="table text-nowrap w-100">
                 <colgroup>
-                  <col style={{ width: 80 }} />
-                  <col style={{ width: 160 }} />
-                  <col />
-                  <col style={{ width: 120 }} />
+                    <col style={{ width: 80 }} />   {/* Order */}
+                    <col style={{ width: 160 }} />  {/* Package */}
+                    <col style={{ width: 180 }} />  {/* Rent */}
+                    <col style={{ width: 100 }} />  {/* Action */}
                 </colgroup>
 
                 <thead>
-                  <tr>
-                    <th className="text-start align-middle header-color">
-                      Order
-                    </th>
-                    <th className="text-start align-middle header-color">
-                      Package
-                    </th>
-                    <th className="text-start align-middle header-color">
-                      Rent
-                    </th>
-                    <th className="text-center align-middle header-color">
-                      Action
-                    </th>
-                  </tr>
+                <tr>
+                    <th className="text-start align-middle header-color">Order</th>
+                    <th className="text-start align-middle header-color">Package</th>
+                    <th className="text-start align-middle header-color">Rent</th>
+                    <th className="text-end align-middle header-color pe-3">Action</th>
+                </tr>
                 </thead>
                 <tbody>
                   {pageRows.length ? (
                     pageRows.map((item, idx) => (
                       <tr key={item.id}>
-                        <td className="align-middle">
+                        <td className="align-middle text-start">
                           {(currentPage - 1) * pageSize + idx + 1}
                         </td>
-                        <td className="align-middle">
+                        <td className="align-middle text-start">
                           <span
                             className="badge rounded-pill px-3 py-2"
                             style={{ backgroundColor: withColor(item).color }}
                           >
-                            <i className="bi bi-circle-fill me-2"></i>
                             {item.contractTypeName}
                           </span>
                         </td>
-                        <td className="align-middle">
+                        <td className="align-middle text-start">
                           {item.rent.toLocaleString()}
                         </td>
-                        <td className="align-middle text-center">
+                        <td className="align-middle pe-3">
                           <div className="form-check form-switch d-inline-flex">
                             <input
                               className="form-check-input"
