@@ -19,18 +19,22 @@ export default function Topbar({ notifications = 0, title = "", icon = "" }) {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    logout();
-    navigate("/login");
+    // ✅ แจ้งเตือนก่อน logout
+    if (window.confirm("Are you sure you want to logout?")) {
+      logout();
+      navigate("/login", { replace: true });
+    }
   };
 
-  // ลบ Logout ซ้ำออก - เก็บแค่อันเดียว
+  // ✅ Enhanced profile menu with logout
   const enhancedProfileMenuItems = [
     ...profileMenuItems.filter(item => item.label !== "Logout"), // กรอง Logout ออกจาก profileMenuItems
     { separator: true },
     {
       label: "Logout",
       icon: "pi pi-sign-out",
-      command: handleLogout
+      command: handleLogout,
+      style: { color: '#dc3545' } // สีแดงเพื่อเน้น
     }
   ];
 

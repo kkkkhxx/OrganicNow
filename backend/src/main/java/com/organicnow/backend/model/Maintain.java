@@ -54,4 +54,16 @@ public class Maintain {
 
     @Column(name = "finish_date")
     private LocalDateTime finishDate; // วันที่เสร็จจริง/ปิดงาน
+
+    @Size(max = 50)
+    @Column(name = "maintain_type", length = 50)
+    private String maintainType; // ประเภทการซ่อม เช่น Fix, Shift, Replace, Maintenance
+
+    @Size(max = 100)
+    @Column(name = "technician_name", length = 100)
+    private String technicianName; // ชื่อช่าง
+
+    @Size(max = 20)
+    @Column(name = "technician_phone", length = 20)
+    private String technicianPhone; // เบอร์โทรช่าง
 }

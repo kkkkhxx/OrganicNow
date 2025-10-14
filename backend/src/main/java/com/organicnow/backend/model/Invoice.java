@@ -53,6 +53,31 @@ public class Invoice {
     @Column(name = "penalty_applied_at")
     private LocalDateTime penaltyAppliedAt; // วันที่เพิ่ม penalty
 
+    // เก็บข้อมูลจาก request สำหรับแสดงผล
+    @Column(name = "package_id")
+    private Long packageId; // Package ที่เลือก
+    
+    @Column(name = "requested_floor")
+    private Integer requestedFloor; // Floor จาก request
+    
+    @Column(name = "requested_room")
+    private String requestedRoom; // Room จาก request
+    
+    @Column(name = "requested_rent")
+    private Integer requestedRent; // Rent จาก Package
+    
+    @Column(name = "requested_water")
+    private Integer requestedWater; // ค่าน้ำจาก request
+    
+    @Column(name = "requested_water_unit")
+    private Integer requestedWaterUnit; // หน่วยน้ำจาก request
+    
+    @Column(name = "requested_electricity")
+    private Integer requestedElectricity; // ค่าไฟจาก request
+    
+    @Column(name = "requested_electricity_unit")
+    private Integer requestedElectricityUnit; // หน่วยไฟจาก request
+
     @PrePersist
     void onCreateDefaults() {
         if (createDate == null) createDate = LocalDateTime.now();

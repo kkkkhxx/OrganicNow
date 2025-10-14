@@ -52,13 +52,17 @@ const Login = () => {
       // Simple mock validation
       if (formData.email === "Admin@admin.com" && formData.password === "password") {
         login(formData.email);
-        showSuccess("Login successful!");
+        showSuccess("Login successful! Welcome back!");
+        
+        // ✅ Enhanced redirect logic
         const from = location.state?.from?.pathname || "/dashboard";
+        console.log("🔄 Redirecting to:", from);
         navigate(from, { replace: true });
       } else {
-        showError("Invalid email or password");
+        showError("Invalid email or password. Please check your credentials.");
       }
     } catch (error) {
+      console.error("Login error:", error);
       showError("Login failed. Please try again.");
     } finally {
       setLoading(false);

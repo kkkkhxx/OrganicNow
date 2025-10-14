@@ -84,11 +84,12 @@ INSERT INTO asset_group (asset_group_name) VALUES
 -- ========================
 -- Maintain
 -- ========================
-INSERT INTO maintain (maintain_id, target_type, room_id, room_asset_id, issue_category, issue_title, issue_description, create_date, scheduled_date, finish_date) VALUES
-                                                                                                                                                                      (1, 0, 1, NULL, 1, 'Air conditioner - Fix', 'แอร์ไม่เย็น มีเสียงดัง', '2025-03-11 00:00:00', '2025-03-14 09:00:00', NULL),
-                                                                                                                                                                      (2, 1, 2, NULL, 0, 'Wall - Fix', 'ผนังร้าวเล็กน้อย', '2025-02-28 00:00:00', '2025-02-28 10:00:00', '2025-02-28 16:00:00'),
-                                                                                                                                                                      (3, 0, 15, NULL, 1, 'Light - Shift', 'ย้ายตำแหน่งโคมไฟ', '2025-02-28 00:00:00', '2025-02-28 13:00:00', '2025-02-28 15:00:00')
-    ON CONFLICT (maintain_id) DO NOTHING;
+-- ✅ ลบ maintain_id ออกเพื่อให้ใช้ AUTO INCREMENT
+INSERT INTO maintain (target_type, room_id, room_asset_id, issue_category, issue_title, issue_description, create_date, scheduled_date, finish_date, maintain_type, technician_name, technician_phone) VALUES
+    (0, 1, NULL, 1, 'Air conditioner - Fix', 'แอร์ไม่เย็น มีเสียงดัง', '2025-03-11 00:00:00', '2025-03-14 09:00:00', NULL, 'Fix', 'PSomchai', '012-345-6789'),
+    (1, 2, NULL, 0, 'Wall - Fix', 'ผนังร้าวเล็กน้อย', '2025-02-28 00:00:00', '2025-02-28 10:00:00', '2025-02-28 16:00:00', 'Fix', 'Anan', '081-234-5678'),
+    (0, 15, NULL, 1, 'Light - Shift', 'ย้ายตำแหน่งโคมไฟ', '2025-02-28 00:00:00', '2025-02-28 13:00:00', '2025-02-28 15:00:00', 'Shift', 'PSomchai', '012-345-6789')
+ON CONFLICT DO NOTHING;
 
 -- ========================
 -- Maintenance Schedule

@@ -20,4 +20,9 @@ public class CreateMaintainRequest {
     private LocalDateTime createDate;    // optional (default now)
     private LocalDateTime scheduledDate; // optional
     private LocalDateTime finishDate;    // optional
+
+    // ✅ เพิ่มฟิลด์ใหม่
+    private String maintainType;         // optional - ประเภทการซ่อม
+    private String technicianName;       // optional - ชื่อช่าง
+    private String technicianPhone;      // optional - เบอร์โทรช่าง
 }

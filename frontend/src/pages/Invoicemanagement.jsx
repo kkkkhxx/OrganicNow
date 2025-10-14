@@ -32,43 +32,44 @@ function InvoiceManagement() {
   const [rooms, setRooms] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [tenants, setTenants] = useState([]);
+  const [packages, setPackages] = useState([]);
 
-  // สำหรับ dropdown ห้อง (ใช้ข้อมูลจาก backend + fallback)
+  // สำหรับ dropdown ห้อง (ใช้ข้อมูลจาก backend เท่านั้น)
   const roomsByFloor = useMemo(() => {
-    // ถ้าไม่มีข้อมูลจาก API ให้ใช้ fallback ตาม data.sql
     if (!rooms || rooms.length === 0) {
-      console.log("⚠️ No rooms from API, using fallback data");
-      return {
-        "1": ["101", "102", "103", "104", "105", "106", "107", "108", "109", "110", "111", "112"],
-        "2": ["201", "202", "203", "204", "205", "206", "207", "208", "209", "210", "211", "212"]
-      };
+      console.log("⚠️ No rooms from API");
+      return {};
     }
 
     const result = {};
-    console.log("🏗️ Processing rooms from API:", rooms); // Debug log
-    rooms.forEach(room => {
-      // ✅ ใช้ field ที่ถูกต้องจาก API response
-      const floor = String(room.roomFloor);
-      if (!result[floor]) result[floor] = [];
-      result[floor].push(String(room.roomNumber));
+    console.log("🏗️ Processing rooms from API:", rooms);
+    
+    rooms.forEach((room, index) => {
+      // ใช้ field names ที่ถูกต้องจาก API response จริง
+      const floor = room.roomFloor;  // field จริงจาก API
+      const roomNumber = room.roomNumber;  // field จริงจาก API
+      
+      if (index < 3) { // แสดง 3 ตัวแรกเป็นตัวอย่าง
+        console.log(`🔍 Room ${index}:`, {
+          roomFloor: floor,
+          roomNumber: roomNumber,
+          roomId: room.roomId
+        });
+      }
+      
+      if (floor !== undefined && floor !== null && roomNumber !== undefined && roomNumber !== null) {
+        const floorStr = String(floor);
+        const roomStr = String(roomNumber);
+        if (!result[floorStr]) result[floorStr] = [];
+        result[floorStr].push(roomStr);
+      }
     });
-    console.log("📋 roomsByFloor result:", result); // Debug log
+    
+    console.log("📋 Final roomsByFloor result:", result);
     return result;
   }, [rooms]);
 
-  // ✅ Fallback data สำหรับ contracts (ตาม data.sql)
-  const contractsData = useMemo(() => [
-    { id: 1, roomId: 1, tenantId: 1, packageId: 1, status: 1 },
-    { id: 2, roomId: 2, tenantId: 2, packageId: 2, status: 1 },
-    { id: 3, roomId: 3, tenantId: 3, packageId: 3, status: 1 }
-  ], []);
 
-  // ✅ Fallback data สำหรับ tenants (ตาม data.sql)
-  const tenantsData = useMemo(() => [
-    { id: 1, firstName: "Somchai", lastName: "Sukjai", nationalId: "1111111111111" },
-    { id: 2, firstName: "Suda", lastName: "Thongdee", nationalId: "2222222222222" },
-    { id: 3, firstName: "Anan", lastName: "Meechai", nationalId: "3333333333333" }
-  ], []);
 
   // helper: LocalDate/LocalDateTime -> YYYY-MM-DD
   const d2str = (v) => {
@@ -118,6 +119,7 @@ function InvoiceManagement() {
     fetchRooms();
     fetchContracts();
     fetchTenants();
+    fetchPackages();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -217,6 +219,27 @@ function InvoiceManagement() {
     }
   };
 
+  // ✅ ดึงข้อมูล packages จาก backend
+  const fetchPackages = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/packages`, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        console.log("📦 Packages from API:", json);
+        setPackages(Array.isArray(json) ? json : []);
+      } else {
+        console.log("❌ Package API failed:", res.status);
+        setPackages([]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch packages:", e);
+      setPackages([]);
+    }
+  };
+
   const handlePageChange = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -237,9 +260,9 @@ function InvoiceManagement() {
 
   // ===== INVOICE FORM STATE (Modal) =====
   const [invForm, setInvForm] = useState({
-    contractId: "", // ✅ ต้องมี
     floor: "",
     room: "",
+    packageId: "", // แทน contractId
     createDate: new Date().toISOString().slice(0, 10),
 
     waterUnit: "",
@@ -247,7 +270,7 @@ function InvoiceManagement() {
     waterRate: 30,
     elecRate: 8,
 
-    rent: "",
+    rent: 0, // จะอัปเดตอัตโนมัติจาก package
     status: "Incomplete",
 
     waterBill: 0,
@@ -266,19 +289,84 @@ function InvoiceManagement() {
     return roomsByFloor[invForm.floor];
   }, [invForm.floor, roomsByFloor]);
 
+  // Auto-select package when floor and room are selected (เฉพาะ active packages)
+  useEffect(() => {
+    if (invForm.floor && invForm.room) {
+      // First try to find from contracts (ใช้ field names ที่ถูกต้อง)
+      const contractData = contracts.find(contract => {
+        const floorMatch = contract.floor === Number(invForm.floor);
+        const roomMatch = contract.room === invForm.room;
+        return floorMatch && roomMatch;
+      });
+      
+      if (contractData && contractData.packageId) {
+        // ✅ ตรวจสอบว่า package ยัง active อยู่หรือไม่
+        const packageData = packages.find(pkg => pkg.id === contractData.packageId);
+        if (packageData && (packageData.is_active === 1 || packageData.is_active === true)) {
+          setInvForm((prev) => ({ 
+            ...prev, 
+            packageId: contractData.packageId.toString()
+          }));
+          return;
+        }
+      }
+      
+      // Fallback: try to find from rooms (ใช้ field names ที่ถูกต้องจาก API)
+      const roomData = rooms.find(room => {
+        const floorMatch = room.roomFloor === Number(invForm.floor);
+        const roomMatch = room.roomNumber === invForm.room;
+        return floorMatch && roomMatch;
+      });
+      
+      if (roomData && roomData.packageId) {
+        // ✅ ตรวจสอบว่า package ยัง active อยู่หรือไม่
+        const packageData = packages.find(pkg => pkg.id === roomData.packageId);
+        if (packageData && (packageData.is_active === 1 || packageData.is_active === true)) {
+          setInvForm((prev) => ({ 
+            ...prev, 
+            packageId: roomData.packageId.toString()
+          }));
+          return;
+        }
+      }
+      
+      setInvForm((prev) => ({ 
+        ...prev, 
+        packageId: ""
+      }));
+    } else {
+      setInvForm((prev) => ({ 
+        ...prev, 
+        packageId: ""
+      }));
+    }
+  }, [invForm.floor, invForm.room, rooms, contracts, packages]);
+
   // ถ้าเปลี่ยนชั้นแล้วห้องเดิมไม่อยู่ในตัวเลือก ให้รีเซ็ตห้อง
   useEffect(() => {
     if (!roomOptions.includes(invForm.room)) {
-      setInvForm((prev) => ({ ...prev, room: "" }));
+      setInvForm((prev) => ({ ...prev, room: "", packageId: "" }));
     }
   }, [invForm.floor, roomOptions]); // eslint-disable-line
 
-  // ✅ Reset room filter เมื่อเปลี่ยน floor filter
+  // ✅ Update rent when package changes (เฉพาะ active packages)
   useEffect(() => {
-    if (!roomOptions.includes(invForm.room)) {
-      setInvForm((prev) => ({ ...prev, room: "" }));
+    if (invForm.packageId && packages.length > 0) {
+      const selectedPackage = packages.find(p => 
+        p.id === Number(invForm.packageId) && 
+        (p.is_active === 1 || p.is_active === true)
+      );
+      if (selectedPackage) {
+        // ใช้ field 'price' แทน 'rent' ตาม DTO structure
+        setInvForm((prev) => ({ ...prev, rent: selectedPackage.price || 0 }));
+      } else {
+        // ถ้า package ไม่ active แล้ว ให้ reset
+        setInvForm((prev) => ({ ...prev, packageId: "", rent: 0 }));
+      }
+    } else {
+      setInvForm((prev) => ({ ...prev, rent: 0 }));
     }
-  }, [invForm.floor, roomOptions]); // eslint-disable-line
+  }, [invForm.packageId, packages]);
 
   const clearFilters = () =>
     setFilters({
@@ -429,12 +517,25 @@ function InvoiceManagement() {
       setSaving(true);
       setErr("");
 
-      if (!invForm.contractId) {
-        throw new Error("Please enter Contract ID");
+      // ตรวจสอบฟิลด์ที่จำเป็น
+      if (!invForm.floor || !invForm.room || !invForm.packageId) {
+        throw new Error("Please select Floor, Room, and Package");
+      }
+
+      // ✅ ตรวจสอบว่า package ที่เลือกยัง active อยู่หรือไม่
+      const selectedPackage = packages.find(p => 
+        p.id === Number(invForm.packageId) && 
+        (p.is_active === 1 || p.is_active === true)
+      );
+      
+      if (!selectedPackage) {
+        throw new Error("Selected package is not available or has been deactivated. Please select another package.");
       }
 
       const body = {
-        contractId: Number(invForm.contractId),
+        packageId: Number(invForm.packageId),
+        floor: invForm.floor,
+        room: invForm.room,
         createDate: invForm.createDate, // YYYY-MM-DD
         rentAmount: Number(invForm.rent || 0),
         waterUnit: Number(invForm.waterUnit || 0),
@@ -443,8 +544,11 @@ function InvoiceManagement() {
         electricityRate: Number(invForm.elecRate || 0),
         penaltyTotal: 0,
         invoiceStatus: mapStatusToCode(invForm.status),
-        // dueDate / subTotal / netAmount: ให้ backend คำนวณเอง
+        // subTotal / netAmount: ให้ backend คำนวณเอง
       };
+
+      console.log("🚀 Sending invoice data:", body);
+      console.log("📋 Current form state:", invForm);
 
       const res = await fetch(`${API_BASE}/invoice/create`, {
         method: "POST",
@@ -453,12 +557,44 @@ function InvoiceManagement() {
         body: JSON.stringify(body),
       });
 
+      console.log("📡 Response status:", res.status);
+
       if (!res.ok) {
         const t = await res.text().catch(() => "");
+        console.error("❌ Backend error:", t);
         throw new Error(t || `HTTP ${res.status}`);
       }
 
-      await fetchData(); // refresh list
+      const result = await res.json();
+      console.log("✅ Backend response:", result);
+      console.log("🔍 Response details - floor:", result.floor, "room:", result.room, "rent:", result.rent);
+
+      // เพิ่มข้อมูลใหม่เข้า state โดยตรง (optimistic update)
+      const newInvoice = {
+        id: result.id,
+        createDate: invForm.createDate,
+        firstName: "New", // placeholder
+        lastName: "Invoice", // placeholder  
+        floor: result.floor || parseInt(invForm.floor),
+        room: result.room || invForm.room,
+        rent: result.rent || parseInt(invForm.rent),
+        water: result.water || parseInt(invForm.waterUnit) * parseInt(invForm.waterRate),
+        electricity: result.electricity || parseInt(invForm.elecUnit) * parseInt(invForm.elecRate),
+        amount: result.netAmount || 0,
+        status: invForm.status || "Incomplete",
+        payDate: null,
+        penalty: 0,
+        penaltyDate: null
+      };
+      
+      // เพิ่มแถวใหม่เข้าไปในตาราง
+      setData(prevData => [newInvoice, ...prevData]);
+      
+      // รอ backend เซฟข้อมูลเสร็จก่อนค่อย refresh
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await fetchData(); // refresh list เพื่อดูข้อมูลจริงจาก database
+      
       showSuccess("🎉 สร้าง Invoice สำเร็จแล้ว!");
       return true;
     } catch (e) {
@@ -516,6 +652,11 @@ function InvoiceManagement() {
                       className="btn btn-primary"
                       data-bs-toggle="modal"
                       data-bs-target="#createInvoiceModal"
+                      onClick={() => {
+                        // ✅ Refresh packages data เมื่อเปิด modal
+                        fetchPackages();
+                        console.log("🔄 Refreshing packages before creating invoice");
+                      }}
                     >
                       <i className="bi bi-plus-lg me-1"></i> Create Invoice
                     </button>
@@ -548,10 +689,10 @@ function InvoiceManagement() {
                     <th className="text-start align-middle header-color">First Name</th>
                     <th className="text-start align-middle header-color">Floor</th>
                     <th className="text-start align-middle header-color">Room</th>
-                    <th className="text-start align-middle header-color">Amount</th>
                     <th className="text-start align-middle header-color">Rent</th>
                     <th className="text-start align-middle header-color">Water</th>
                     <th className="text-start align-middle header-color">Electricity</th>
+                    <th className="text-start align-middle header-color">NET</th>
                     <th className="text-start align-middle header-color">Status</th>
                     <th className="text-start align-middle header-color">Pay date</th>
                     <th className="text-start align-middle header-color">Penalty</th>
@@ -562,7 +703,7 @@ function InvoiceManagement() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="13" className="text-center">
+                      <td colSpan="12" className="text-center">
                         Loading...
                       </td>
                     </tr>
@@ -583,10 +724,10 @@ function InvoiceManagement() {
                         <td className="align-middle text-start">{item.firstName}</td>
                         <td className="align-middle text-start">{item.floor}</td>
                         <td className="align-middle text-start">{item.room}</td>
-                        <td className="align-middle text-start">{item.amount.toLocaleString()}</td>
                         <td className="align-middle text-start">{item.rent.toLocaleString()}</td>
                         <td className="align-middle text-start">{item.water.toLocaleString()}</td>
                         <td className="align-middle text-start">{item.electricity.toLocaleString()}</td>
+                        <td className="align-middle text-start ">{(item.rent + item.water + item.electricity).toLocaleString()}</td>
                         <td className="align-middle text-start">
                           <span
                             className={`badge ${
@@ -635,7 +776,7 @@ function InvoiceManagement() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="13" className="text-center">
+                      <td colSpan="12" className="text-center">
                         No invoices found
                       </td>
                     </tr>
@@ -674,7 +815,7 @@ function InvoiceManagement() {
               modal?.hide();
               setInvForm((p) => ({
                 ...p,
-                contractId: "",
+                packageId: "",
                 floor: "",
                 room: "",
                 waterUnit: "",
@@ -689,41 +830,30 @@ function InvoiceManagement() {
             }
           }}
         >
-          {/* ===== Room / Contract Info ===== */}
+          {/* ===== Room / Package Info ===== */}
           <div className="row g-3 align-items-start">
             <div className="col-md-3">
-              <strong>Room / Contract</strong>
+              <strong>Room / Package</strong>
             </div>
 
             <div className="col-md-9">
               <div className="row g-3">
                 <div className="col-md-6">
-                  <label className="form-label">Contract ID</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder="e.g. 1"
-                    min={1}
-                    value={invForm.contractId}
-                    onChange={(e) => setInvForm((p) => ({ ...p, contractId: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">Floor (optional)</label>
+                  <label className="form-label">Floor <span className="text-danger">*</span></label>
                   <div className="input-group">
                     <select
                       className="form-select"
                       value={invForm.floor}
                       onChange={(e) => setInvForm((p) => ({ ...p, floor: e.target.value }))}
+                      required
+                      style={{ backgroundColor: '#fff', color: '#000' }}
                     >
                       <option value="" hidden>
                         Select Floor
                       </option>
                       {Object.keys(roomsByFloor).sort().map((floor) => (
-                        <option key={floor} value={floor}>
-                          {floor}
+                        <option key={floor} value={floor} style={{ backgroundColor: '#fff', color: '#000' }}>
+                          Floor {floor}
                         </option>
                       ))}
                     </select>
@@ -731,24 +861,98 @@ function InvoiceManagement() {
                 </div>
 
                 <div className="col-md-6">
-                  <label className="form-label">Room (optional)</label>
+                  <label className="form-label">Room <span className="text-danger">*</span></label>
                   <div className="input-group">
                     <select
                       className="form-select"
                       value={invForm.room}
                       onChange={(e) => setInvForm((p) => ({ ...p, room: e.target.value }))}
                       disabled={!invForm.floor}
+                      required
+                      style={{ backgroundColor: '#fff', color: '#000' }}
                     >
                       <option value="" hidden>
                         {invForm.floor ? "Select Room" : "Select Floor first"}
                       </option>
                       {roomOptions.map((rm) => (
-                        <option key={rm} value={rm}>
-                          {rm}
+                        <option key={rm} value={rm} style={{ backgroundColor: '#fff', color: '#000' }}>
+                          Room {rm}
                         </option>
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="col-md-12">
+                  <label className="form-label">
+                    Package 
+                    {/* <span className="text-muted ms-2">
+                      ({packages.filter(pkg => pkg.is_active === 1 || pkg.is_active === true).length} active packages available)
+                    </span> */}
+                  </label>
+                  {invForm.packageId && packages.length > 0 ? (
+                    <div className="d-flex align-items-center gap-2">
+                      <div className="form-control bg-light" style={{ flex: 1 }}>
+                        {(() => {
+                          const selectedPackage = packages.find(p => 
+                            p.id === Number(invForm.packageId) && 
+                            (p.is_active === 1 || p.is_active === true)
+                          );
+                          if (!selectedPackage) {
+                            return (
+                              <div className="text-danger">
+                                <i className="bi bi-exclamation-triangle me-1"></i>
+                                Package not available (may be inactive)
+                              </div>
+                            );
+                          }
+                          return selectedPackage ? 
+                            `${selectedPackage.contract_name || selectedPackage.name || 'Package'} - ฿${selectedPackage.price ? selectedPackage.price.toLocaleString() : 'N/A'}` :
+                            'Loading package...';
+                        })()}
+                      </div>
+                      <button 
+                        type="button" 
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={() => setInvForm(prev => ({ ...prev, packageId: '' }))}
+                      >
+                        เปลี่ยน
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      className="form-select"
+                      value={invForm.packageId}
+                      onChange={(e) => setInvForm((p) => ({ ...p, packageId: e.target.value }))}
+                      required
+                      style={{ backgroundColor: '#fff', color: '#000' }}
+                    >
+                      <option value="" hidden>
+                        {invForm.floor && invForm.room ? "Select Package" : "Select Floor and Room first"}
+                      </option>
+                      {/* ✅ กรองเฉพาะ packages ที่ active เท่านั้น */}
+                      {packages.filter(pkg => pkg.is_active === 1 || pkg.is_active === true).length === 0 ? (
+                        <option value="" disabled style={{ backgroundColor: '#fff', color: '#dc3545' }}>
+                          No active packages available - Please activate packages first
+                        </option>
+                      ) : (
+                        packages
+                          .filter(pkg => pkg.is_active === 1 || pkg.is_active === true)
+                          .sort((a, b) => {
+                            // เรียงตาม duration จากน้อยไปมาก (3, 6, 9, 12 เดือน)
+                            const durationA = a.duration || 0;
+                            const durationB = b.duration || 0;
+                            return durationA - durationB;
+                          })
+                          .map((pkg) => (
+                            <option key={pkg.id} value={pkg.id} style={{ backgroundColor: '#fff', color: '#000' }}>
+                              {pkg.contract_name || pkg.name || `Package ${pkg.id}`} - ฿{pkg.price ? pkg.price.toLocaleString() : 'N/A'}
+                              {pkg.duration && ` (${pkg.duration} เดือน)`}
+                            </option>
+                          ))
+                      )}
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
@@ -770,15 +974,16 @@ function InvoiceManagement() {
                   <input type="date" className="form-control" value={invForm.createDate} disabled />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Rent</label>
+                  <label className="form-label">Rent (from package)</label>
                   <input
-                    type="number"
+                    type="text"
                     className="form-control"
-                    placeholder="Rent"
-                    min={0}
-                    value={invForm.rent}
-                    onChange={(e) => setInvForm((p) => ({ ...p, rent: e.target.value }))}
+                    value={`฿${invForm.rent.toLocaleString()}`}
+                    disabled
                   />
+                  <div className="form-text text-muted">
+                    {invForm.packageId && packages.find(p => p.id === Number(invForm.packageId))?.name}
+                  </div>
                 </div>
 
                 {/* แถว 2: Water */}
@@ -827,8 +1032,8 @@ function InvoiceManagement() {
                     value={invForm.status}
                     onChange={(e) => setInvForm((p) => ({ ...p, status: e.target.value }))}
                   >
-                    <option value="Incomplete">📋 Incomplete (ยังไม่ชำระ)</option>
-                    <option value="Complete">✅ Complete (ชำระแล้ว)</option>
+                    <option value="Incomplete">Incomplete (ยังไม่ชำระ)</option>
+                    <option value="Complete">Complete (ชำระแล้ว)</option>
                   </select>
                 </div>
               </div>
@@ -871,8 +1076,8 @@ function InvoiceManagement() {
                 onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
               >
                 <option value="ALL">All</option>
-                <option value="Complete">✅ Complete (ชำระแล้ว)</option>
-                <option value="Incomplete">📋 Incomplete (ยังไม่ชำระ)</option>
+                <option value="Complete">Complete (ชำระแล้ว)</option>
+                <option value="Incomplete">Incomplete (ยังไม่ชำระ)</option>
               </select>
             </div>
 

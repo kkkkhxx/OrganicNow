@@ -66,4 +66,9 @@ public class CreateInvoiceRequest {
 
     // นามแฝงจาก UI (elecUnit -> electricityUnit)
     private Integer elecUnit;           // ใช้แทน electricityUnit ถ้าส่งมา
+    
+    // ===== ส่วนใหม่: รองรับการสร้าง invoice โดยไม่ต้องมี contract =====
+    private Long packageId;             // อ้างอิง package โดยตรง
+    private String floor;               // ชั้น (เช่น "1", "2")
+    private String room;                // ห้อง (เช่น "101", "102")
 }

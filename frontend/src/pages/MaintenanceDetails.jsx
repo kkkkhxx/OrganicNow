@@ -29,6 +29,7 @@ function MaintenanceDetails() {
 
   // โหลดข้อมูล
   const [data, setData] = useState(null);
+  const [tenantData, setTenantData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -46,11 +47,69 @@ function MaintenanceDetails() {
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
       setData(json);
+      
+      // ✅ ดึงข้อมูล tenant จากห้อง
+      if (json.roomId) {
+        await fetchTenantFromRoom(json.roomId);
+      }
     } catch (e) {
       console.error(e);
       setErr("Failed to load maintenance.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ✅ ฟังก์ชันดึงข้อมูล tenant จาก contract
+  const fetchTenantFromRoom = async (roomId) => {
+    try {
+      console.log("🔍 Fetching tenant for roomId:", roomId);
+      
+      const res = await fetch(`${API_BASE}/tenant/list`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const json = await res.json();
+        console.log("📋 Tenant API response:", json);
+        
+        const tenantList = json.results || json;
+        console.log("👥 Tenant list:", tenantList);
+        
+        if (Array.isArray(tenantList)) {
+          console.log("🔎 Looking for tenant with roomId:", roomId);
+          tenantList.forEach((tenant, index) => {
+            console.log(`Tenant ${index}:`, {
+              roomId: tenant.roomId,
+              status: tenant.status,
+              firstName: tenant.firstName,
+              lastName: tenant.lastName
+            });
+          });
+          
+          // หา tenant ที่อยู่ในห้องนี้ (รวมทั้งที่หมดอายุแล้ว)
+          console.log("🔍 Searching for roomId:", roomId, "type:", typeof roomId);
+          
+          const tenant = tenantList.find(t => {
+            const roomIdMatch = Number(t.roomId) === Number(roomId);
+            // เปลี่ยนจาก status=1 เป็น status>=0 เพื่อรวม tenant ที่หมดอายุ
+            const statusMatch = Number(t.status) >= 0;
+            console.log(`Checking tenant: roomId=${t.roomId} vs ${roomId} (match: ${roomIdMatch}), status=${t.status} (match: ${statusMatch})`);
+            return roomIdMatch && statusMatch;
+          });
+          
+          console.log("🎯 Found tenant:", tenant);
+          setTenantData(tenant || null);
+        } else {
+          console.log("❌ Tenant list is not an array");
+          setTenantData(null);
+        }
+      } else {
+        console.log("❌ Tenant API failed:", res.status);
+        setTenantData(null);
+      }
+    } catch (e) {
+      console.error("❌ Failed to fetch tenant data:", e);
+      setTenantData(null);
     }
   };
 
@@ -97,6 +156,9 @@ function MaintenanceDetails() {
     requestDate: "",
     maintainDate: "",
     completeDate: "",
+    maintainType: "", // ✅ เพิ่มฟิลด์ maintain type
+    technician: "",   // ✅ เพิ่มฟิลด์ช่าง
+    phone: "",        // ✅ เพิ่มฟิลด์เบอร์โทรช่าง
   });
 
   // ✅ Issue options for Asset target
@@ -106,6 +168,14 @@ function MaintenanceDetails() {
     { value: "plumbing", label: "ประปา" },
     { value: "electrical", label: "ไฟฟ้า" },
     { value: "other", label: "อื่นๆ" }
+  ];
+
+  // ✅ Maintain type options
+  const maintainTypeOptions = [
+    { value: "fix", label: "Fix" },
+    { value: "shift", label: "Shift" },
+    { value: "replace", label: "Replace" },
+    { value: "maintenance", label: "Maintenance" }
   ];
 
   useEffect(() => {
@@ -118,6 +188,9 @@ function MaintenanceDetails() {
       requestDate: toDate(data.createDate) || "",
       maintainDate: toDate(data.scheduledDate) || "",
       completeDate: toDate(data.finishDate) || "",
+      maintainType: data.maintainType || "", // ✅ ดึงจาก backend
+      technician: data.technicianName || "",   // ✅ ดึงจาก backend  
+      phone: data.technicianPhone || "",        // ✅ ดึงจาก backend
     });
   }, [data]);
 
@@ -153,6 +226,10 @@ function MaintenanceDetails() {
         issueDescription: form.issueDescription,
         scheduledDate: toLdt(form.maintainDate),
         finishDate: form.completeDate ? toLdt(form.completeDate) : null,
+        // ✅ เพิ่มฟิลด์ใหม่
+        maintainType: form.maintainType,
+        technicianName: form.technician,
+        technicianPhone: form.phone,
       };
 
       const res = await fetch(`${API_BASE}/maintain/update/${maintainId}`, {
@@ -357,12 +434,138 @@ function MaintenanceDetails() {
                             <span className="label">Floor:</span>{" "}
                             <span className="value">{data.roomFloor ?? "-"}</span>
                           </p>
+                          {/* <p>
+                            <span className="label">Target:</span>{" "}
+                            <span className="value">
+                              <span className={`badge ${data.targetType === 0 ? 'bg-info' : 'bg-primary'}`}>
+                                <i className={`bi ${data.targetType === 0 ? 'bi-gear' : 'bi-building'} me-1`}></i>
+                                {data.targetType === 0 ? "Asset" : "Building"}
+                              </span>
+                            </span>
+                          </p> */}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="card border-0 shadow-sm rounded-2">
+                    <div className="card-body">
+                      <h5 className="card-title">Tenant Information</h5>
+                      {loading ? (
+                        <div>Loading tenant info...</div>
+                      ) : tenantData ? (
+                        <>
+                          <p>
+                            <span className="label">First Name:</span>{" "}
+                            <span className="value">{tenantData.firstName || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Last Name:</span>{" "}
+                            <span className="value">{tenantData.lastName || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">National ID:</span>{" "}
+                            <span className="value">{tenantData.nationalId || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Phone Number:</span>{" "}
+                            <span className="value">{tenantData.phoneNumber || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Email:</span>{" "}
+                            <span className="value">{tenantData.email || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Package:</span>{" "}
+                            <span className="value">
+                              <span className="badge bg-primary">
+                                <i className="bi bi-box me-1"></i>
+                                {tenantData.contractName || "Standard Package"}
+                              </span>
+                            </span>
+                          </p>
+                          <div className="row">
+                            <div className="col-6">
+                              <p>
+                                <span className="label">Sign date:</span>{" "}
+                                <span className="value">{toDate(tenantData.signDate) || "-"}</span>
+                              </p>
+                              <p>
+                                <span className="label">End date:</span>{" "}
+                                <span className="value">{toDate(tenantData.endDate) || "-"}</span>
+                              </p>
+                            </div>
+                            <div className="col-6">
+                              <p>
+                                <span className="label">Start date:</span>{" "}
+                                <span className="value">{toDate(tenantData.startDate) || "-"}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-muted">
+                          <i className="bi bi-info-circle me-2"></i>
+                          No active tenant found for this room
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right column */}
+                <div className="col-lg-6">
+                  <div className="card border-0 shadow-sm mb-3 rounded-2">
+                    <div className="card-body">
+                      <h5 className="card-title">Request Information</h5>
+                      {loading || !data ? (
+                        <div>Loading...</div>
+                      ) : (
+                        <>
                           <p>
                             <span className="label">Target:</span>{" "}
                             <span className="value">
                               <span className={`badge ${data.targetType === 0 ? 'bg-info' : 'bg-primary'}`}>
                                 <i className={`bi ${data.targetType === 0 ? 'bi-gear' : 'bi-building'} me-1`}></i>
                                 {data.targetType === 0 ? "Asset" : "Building"}
+                              </span>
+                            </span>
+                          </p>
+                          <p>
+                            <span className="label">Issue:</span>{" "}
+                            <span className="value">{data.issueTitle || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Maintain type:</span>{" "}
+                            <span className="value">
+                              {data.maintainType ? (
+                                <span className="badge bg-warning text-dark">
+                                  <i className="bi bi-circle-fill me-1"></i>
+                                  {data.maintainType}
+                                </span>
+                              ) : (
+                                <span className="text-muted">-</span>
+                              )}
+                            </span>
+                          </p>
+                          <p>
+                            <span className="label">Request date:</span>{" "}
+                            <span className="value">{toDate(data.createDate) || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Maintain date:</span>{" "}
+                            <span className="value">{toDate(data.scheduledDate) || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">Complete date:</span>{" "}
+                            <span className="value">{toDate(data.finishDate) || "-"}</span>
+                          </p>
+                          <p>
+                            <span className="label">State:</span>{" "}
+                            <span className="value">
+                              <span className={`badge ${statusInfo.badge}`}>
+                                <i className={`${statusInfo.icon} me-1`}></i>
+                                {statusInfo.text}
                               </span>
                             </span>
                           </p>
@@ -373,76 +576,23 @@ function MaintenanceDetails() {
 
                   <div className="card border-0 shadow-sm rounded-2">
                     <div className="card-body">
-                      <h5 className="card-title">Request Information</h5>
+                      <h5 className="card-title">Technician Information</h5>
                       {loading || !data ? (
                         <div>Loading...</div>
                       ) : (
                         <>
                           <p>
-                            <span className="label">Issue title:</span>{" "}
-                            <span className="value">{data.issueTitle || "-"}</span>
+                            <span className="label">Technician's name:</span>{" "}
+                            <span className="value">{data.technicianName || "-"}</span>
                           </p>
                           <p>
-                            <span className="label">Issue category:</span>{" "}
-                            <span className="value">{data.issueCategory ?? "-"}</span>
-                          </p>
-                          <p>
-                            <span className="label">Description:</span>{" "}
-                            <span className="value">
-                              {data.issueDescription || "-"}
-                            </span>
+                            <span className="label">Phone Number:</span>{" "}
+                            <span className="value">{data.technicianPhone || "-"}</span>
                           </p>
                         </>
                       )}
                     </div>
                   </div>
-                </div>
-
-                {/* Right column */}
-                <div className="col-lg-6">
-                  <div className="card border-0 shadow-sm mb-3 rounded-2">
-                    <div className="card-body">
-                      <h5 className="card-title">Schedule</h5>
-                      {loading || !data ? (
-                        <div>Loading...</div>
-                      ) : (
-                        <div className="row">
-                          <div className="col-6">
-                            <p>
-                              <span className="label">Create date:</span>{" "}
-                              <span className="value">{toDate(data.createDate) || "-"}</span>
-                            </p>
-                            <p>
-                              <span className="label">Maintain date:</span>{" "}
-                              <span className="value">
-                                {toDate(data.scheduledDate) || "-"}
-                              </span>
-                            </p>
-                          </div>
-                          <div className="col-6">
-                            <p>
-                              <span className="label">Complete date:</span>{" "}
-                              <span className="value">
-                                {toDate(data.finishDate) || "-"}
-                              </span>
-                            </p>
-                            <p>
-                              <span className="label">Status:</span>{" "}
-                              <span className="value">
-                                <span className={`badge ${statusInfo.badge}`}>
-                                  <i className={`${statusInfo.icon} me-1`}></i>
-                                  {statusInfo.text}
-                                </span>
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* เผื่ออนาคต: Technician หรือ Cost ฯลฯ */}
-                  {/* <div className="card border-0 shadow-sm rounded-2"> ... </div> */}
                 </div>
               </div>
             </div>
@@ -462,18 +612,18 @@ function MaintenanceDetails() {
           <div className="p-3">Loading...</div>
         ) : (
           <form onSubmit={handleSave}>
-            {/* Room (lock ไม่ให้แก้ เพื่อคง UX เดิม) */}
+            {/* Room Information */}
             <div className="row g-3 align-items-start">
               <div className="col-md-3"><strong>Room Information</strong></div>
               <div className="col-md-9">
                 <div className="row g-3">
                   <div className="col-md-6">
-                    <label className="form-label">Room</label>
-                    <input type="text" className="form-control" value={data.roomNumber || ""} disabled />
-                  </div>
-                  <div className="col-md-6">
                     <label className="form-label">Floor</label>
                     <input type="text" className="form-control" value={data.roomFloor ?? ""} disabled />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Room</label>
+                    <input type="text" className="form-control" value={data.roomNumber || ""} disabled />
                   </div>
                 </div>
               </div>
@@ -481,13 +631,13 @@ function MaintenanceDetails() {
 
             <hr className="my-4" />
 
-            {/* Request */}
+            {/* Repair Information */}
             <div className="row g-3 align-items-start">
-              <div className="col-md-3"><strong>Request Information</strong></div>
+              <div className="col-md-3"><strong>Repair Information</strong></div>
               <div className="col-md-9">
                 <div className="row g-3">
                   <div className="col-md-6">
-                    <label className="form-label">Target Type</label>
+                    <label className="form-label">Target</label>
                     <select
                       className="form-select"
                       name="target"
@@ -500,14 +650,8 @@ function MaintenanceDetails() {
                     </select>
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label">Create date</label>
-                    <input type="date" className="form-control" value={form.requestDate} disabled />
-                  </div>
-                  
-                  {/* ✅ Conditional Issue Input based on Target */}
-                  {form.target === "asset" ? (
-                    <div className="col-md-6">
-                      <label className="form-label">Issue Category</label>
+                    <label className="form-label">Issue</label>
+                    {form.target === "asset" ? (
                       <select
                         className="form-select"
                         name="issueCategory"
@@ -522,66 +666,44 @@ function MaintenanceDetails() {
                           </option>
                         ))}
                       </select>
-                    </div>
-                  ) : (
-                    <div className="col-md-6">
-                      <label className="form-label">Issue Title (Building)</label>
+                    ) : (
                       <input
                         type="text"
                         className="form-control"
                         name="issueTitle"
                         value={form.issueTitle}
                         onChange={onChange}
-                        placeholder="ระบุปัญหาของอาคาร เช่น ลิฟต์เสีย, ระบบแอร์กลาง"
+                        placeholder="ระบุปัญหาของอาคาร"
                         required
                       />
-                    </div>
-                  )}
-                  
-                  {form.target === "asset" && (
-                    <div className="col-md-6">
-                      <label className="form-label">Issue Title (Asset)</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        name="issueTitle"
-                        value={form.issueTitle}
-                        onChange={onChange}
-                        placeholder="ระบุรายละเอียดปัญหา"
-                        required
-                      />
-                    </div>
-                  )}
-                  
-                  <div className="col-md-12">
-                    <label className="form-label">Description</label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      name="issueDescription"
-                      value={form.issueDescription}
-                      onChange={onChange}
-                      placeholder={form.target === "asset" ? 
-                        "อธิบายรายละเอียดปัญหาของอุปกรณ์" : 
-                        "อธิบายรายละเอียดปัญหาของอาคาร"}
-                    />
+                    )}
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <hr className="my-4" />
-
-            {/* Schedule */}
-            <div className="row g-3 align-items-start">
-              <div className="col-md-3"><strong>Schedule & Status</strong></div>
-              <div className="col-md-9">
-                <div className="row g-3">
+                  
                   <div className="col-md-6">
-                    <label className="form-label">
-                      Maintain date 
-                      <small className="text-muted">(sets status to "In Progress")</small>
-                    </label>
+                    <label className="form-label">Maintain type</label>
+                    <select
+                      className="form-select"
+                      name="maintainType"
+                      value={form.maintainType}
+                      onChange={onChange}
+                      required
+                    >
+                      <option value="">เลือกประเภทการซ่อม</option>
+                      {maintainTypeOptions.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <label className="form-label">Request date</label>
+                    <input type="date" className="form-control" value={form.requestDate} disabled />
+                  </div>
+                  
+                  <div className="col-md-6">
+                    <label className="form-label">Maintain date</label>
                     <input
                       type="date"
                       className="form-control"
@@ -590,33 +712,70 @@ function MaintenanceDetails() {
                       onChange={onChange}
                     />
                   </div>
+                  
                   <div className="col-md-6">
-                    <label className="form-label">
-                      Complete date 
-                      <small className="text-muted">(sets status to "Complete")</small>
-                    </label>
+                    <label className="form-label">State</label>
+                    <select
+                      className="form-select"
+                      name="state"
+                      value={form.state}
+                      onChange={onChange}
+                    >
+                      <option value="Not Started">Not Started</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Complete">Complete</option>
+                    </select>
+                  </div>
+                  
+                  <div className="col-md-12">
+                    <label className="form-label">Complete date</label>
                     <input
                       type="date"
                       className="form-control"
                       name="completeDate"
                       value={form.completeDate}
                       onChange={onChange}
+                      disabled={form.state !== "Complete"}
                     />
-                  </div>
-                  <div className="col-12">
-                    <div className="alert alert-info py-2">
-                      <i className="bi bi-info-circle me-2"></i>
-                      <strong>Status Logic:</strong>
-                      <ul className="mb-0 mt-1">
-                        <li><strong>Not Started:</strong> No dates set</li>
-                        <li><strong>In Progress:</strong> Maintain date set, no complete date</li>
-                        <li><strong>Complete:</strong> Complete date is set</li>
-                      </ul>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            <hr className="my-4" />
+
+            {/* Technician Information */}
+            <div className="row g-3 align-items-start">
+              <div className="col-md-3"><strong>Technician Information</strong></div>
+              <div className="col-md-9">
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Technician's name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="technician"
+                      value={form.technician}
+                      onChange={onChange}
+                      placeholder="Add Technician's name"
+                    />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      name="phone"
+                      value={form.phone}
+                      onChange={onChange}
+                      placeholder="Add Phone Number"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr className="my-4" />
 
             {/* Footer */}
             <div className="d-flex justify-content-center gap-3 pt-4 pb-2">

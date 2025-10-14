@@ -45,4 +45,6 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     RoomDetailDto findRoomDetail(@Param("roomId") Long roomId);
 
     Optional<Room> findByRoomNumber(String roomNumber);
+    
+    Optional<Room> findByRoomFloorAndRoomNumber(Integer roomFloor, String roomNumber);
 }

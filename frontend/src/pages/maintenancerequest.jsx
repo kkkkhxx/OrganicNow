@@ -111,7 +111,7 @@ function MaintenanceRequest() {
         floor: (m.roomFloor ?? "").toString(),
         target: m.targetType === 0 ? "Asset" : "Building",
         issue: m.issueTitle ?? "-",
-        maintainType: "-", // (UI-only) ไม่มีใน schema
+        maintainType: m.maintainType ?? "-", // ✅ ดึงจาก backend
         requestDate: (m.createDate || "").slice(0, 10),
         maintainDate: m.scheduledDate ? m.scheduledDate.slice(0, 10) : "-",
         completeDate: m.finishDate ? m.finishDate.slice(0, 10) : "-",
@@ -300,7 +300,14 @@ function MaintenanceRequest() {
         createDate: d2ldt(form.requestDate),
         scheduledDate: d2ldt(form.maintainDate),
         finishDate: form.state === "Complete" && form.completeDate ? d2ldt(form.completeDate) : null,
+        
+        // ✅ เพิ่มฟิลด์ใหม่
+        maintainType: form.maintainType,
+        technicianName: form.technician,
+        technicianPhone: form.phone,
       };
+
+      console.log("🚀 Creating maintenance request:", payload);
 
       const res = await fetch(`${API_BASE}/maintain/create`, {
         method: "POST",
@@ -308,13 +315,26 @@ function MaintenanceRequest() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error(await res.text());
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error("❌ Backend error:", errorText);
+        throw new Error(errorText);
+      }
+
+      const result = await res.json();
+      console.log("✅ Create success:", result);
+
+      // ✅ รอ 500ms ก่อน fetch ใหม่เพื่อให้ database commit เสร็จ
+      await new Promise(resolve => setTimeout(resolve, 500));
       await fetchData();
+      
       resetForm();
       closeModal(); // ปิดโมดัลหลังบันทึกสำเร็จ
       showSuccess("✅ สร้าง Maintenance Request สำเร็จ!");
+      
     } catch (e2) {
-      console.error(e2);
+      console.error("❌ Create failed:", e2);
       showError(`❌ สร้าง Maintenance Request ไม่สำเร็จ: ${e2.message}`);
     } finally {
       setSaving(false);
@@ -387,11 +407,20 @@ function MaintenanceRequest() {
                   <table className="table text-nowrap align-middle tm-left mb-0">
                     <thead className="header-color">
                       <tr>
+                        <th className="text-center align-middle header-color">
+                          <input 
+                            type="checkbox" 
+                            checked={isAllSelected} 
+                            onChange={toggleAll}
+                            aria-label="Select all"
+                          />
+                        </th>
                         <th>Order</th>
                         <th>Room</th>
                         <th>Floor</th>
                         <th>Target</th>
                         <th>Issue</th>
+                        <th>Maintain Type</th>
                         <th>Request date</th>
                         <th>Maintain date</th>
                         <th>Complete date</th>
@@ -402,15 +431,24 @@ function MaintenanceRequest() {
 
                     <tbody>
                       {loading ? (
-                        <tr><td colSpan="10" className="text-center">Loading...</td></tr>
+                        <tr><td colSpan="12" className="text-center">Loading...</td></tr>
                       ) : pageRows.length ? (
                         pageRows.map((row, index) => (
                           <tr key={row.id}>
+                            <td className="text-center align-middle">
+                              <input 
+                                type="checkbox" 
+                                checked={selected.includes(row.id)} 
+                                onChange={() => toggleRow(row.id)}
+                                aria-label={`Select row ${row.id}`}
+                              />
+                            </td>
                             <td>{pageStart + index + 1}</td>
                             <td>{row.room}</td>
                             <td>{row.floor}</td>
                             <td>{row.target}</td>
                             <td>{row.issue}</td>
+                            <td>{row.maintainType || "-"}</td>
                             <td>{row.requestDate}</td>
                             <td>{row.maintainDate}</td>
                             <td>{row.completeDate}</td>
@@ -435,7 +473,7 @@ function MaintenanceRequest() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan="10" className="text-center">Data Not Found</td>
+                          <td colSpan="12" className="text-center">Data Not Found</td>
                         </tr>
                       )}
                     </tbody>
@@ -545,6 +583,22 @@ function MaintenanceRequest() {
                       </div>
 
                       <div className="col-md-6">
+                        <label className="form-label">Maintain type</label>
+                        <select
+                          name="maintainType"
+                          className="form-select"
+                          value={form.maintainType}
+                          onChange={onFormChange}
+                        >
+                          <option value="">Select Maintain type</option>
+                          <option value="fix">Fix</option>
+                          <option value="shift">Shift</option>
+                          <option value="replace">Replace</option>
+                          <option value="maintenance">Maintenance</option>
+                        </select>
+                      </div>
+
+                      <div className="col-md-6">
                         <label className="form-label">Request date</label>
                         <input
                           type="date"
@@ -592,6 +646,36 @@ function MaintenanceRequest() {
                       </div>
                     </div>
                   </div>
+
+                  {/* ✅ Technician Information */}
+                  <div className="col-12">
+                    <h6 className="text-muted mb-2">Technician Information</h6>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label">Technician's name</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          name="technician"
+                          value={form.technician}
+                          onChange={onFormChange}
+                          placeholder="Add Technician's name"
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label">Phone Number</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          name="phone"
+                          value={form.phone}
+                          onChange={onFormChange}
+                          placeholder="Add Phone Number"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="d-flex justify-content-center gap-3 mt-5">
@@ -606,7 +690,7 @@ function MaintenanceRequest() {
                   <button type="submit" className="btn btn-primary" disabled={!isFormValid || saving}>
                     {saving ? "Saving..." : "Save"}
                   </button>
-                  {!isFormValid && (
+                  {/* {!isFormValid && (
                     <div className="mt-2">
                       <small className="text-danger">
                         Please fill required fields: 
@@ -616,7 +700,7 @@ function MaintenanceRequest() {
                         {!form.requestDate && " [Request Date]"}
                       </small>
                     </div>
-                  )}
+                  )} */}
                 </div>
               </form>
             </Modal>
