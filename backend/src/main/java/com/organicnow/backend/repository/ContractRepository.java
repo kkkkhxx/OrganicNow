@@ -1,6 +1,7 @@
 package com.organicnow.backend.repository;
 
 import com.organicnow.backend.model.Contract;
+import com.organicnow.backend.model.Room;
 import com.organicnow.backend.dto.TenantDto;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.stereotype.Repository;
@@ -8,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Long> {
@@ -28,6 +30,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
             c.endDate,
             t.phoneNumber,
             t.email,
+            t.nationalId,
             case when c.endDate < CURRENT_TIMESTAMP then 0 else c.status end
         )
         from Contract c
@@ -70,4 +73,6 @@ public interface ContractRepository extends JpaRepository<Contract, Long> {
           and c.status = 1
     """)
     int updateExpiredContracts();
+    
+    Optional<Contract> findByRoomAndPackagePlan_IdAndStatus(Room room, Long packageId, Integer status);
 }

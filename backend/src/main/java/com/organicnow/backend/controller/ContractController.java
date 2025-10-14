@@ -8,12 +8,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/contracts")
+@RequestMapping("/contract") // เปลี่ยนจาก /contracts เป็น /contract
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class ContractController {
 
     private final ContractService contractService;
+
+    // ✅ API สำหรับ frontend invoice management - GET /contract/list
+    @GetMapping("/list")
+    public List<TenantDto> getContractList() {
+        return contractService.getTenantList();
+    }
 
     // ✅ API ดึง tenant list
     @GetMapping("/tenant/list")
@@ -26,4 +32,5 @@ public class ContractController {
     public List<Long> getOccupiedRooms() {
         return contractService.getOccupiedRoomIds();
     }
+
 }
