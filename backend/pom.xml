@@ -129,11 +129,32 @@
                 </configuration>
             </plugin>
 
+            <!-- เริ่ม/หยุด Spring Boot app ระหว่าง integration test -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>pre-integration-test</id>
+                        <goals><goal>start</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>post-integration-test</id>
+                        <goals><goal>stop</goal></goals>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- OpenAPI JSON ระหว่าง CI -->
             <plugin>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-maven-plugin</artifactId>
-                <version>1.8</version>
+                <version>1.5</version>
                 <executions>
                     <execution>
                         <goals><goal>generate</goal></goals>
