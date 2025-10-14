@@ -81,12 +81,20 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres123
+          # ✅ บังคับ base-path และ exposure สำหรับโปรไฟล์ test
+          MANAGEMENT_ENDPOINTS_WEB_BASE_PATH: /api/actuator
+          MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
         run: |
           set -euo pipefail
           nohup ./mvnw -q -DskipTests spring-boot:run >/dev/null 2>&1 &
+          # ลอง /api/actuator/health ก่อน ถ้าไม่เจอ fallback เป็น /actuator/health
           for i in {1..60}; do
             if curl -fsS http://localhost:8080/api/actuator/health | grep -q '"status":"UP"'; then
-              echo "Spring Boot is UP ✅"
+              echo "Spring Boot is UP at /api/actuator/health ✅"
+              break
+            fi
+            if curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "Spring Boot is UP at /actuator/health ✅"
               break
             fi
             echo "Waiting for Spring Boot... ($i/60)"
