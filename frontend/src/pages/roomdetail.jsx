@@ -63,7 +63,7 @@ function RoomDetail() {
     const fetchRoomDetail = async () => {
       try {
         const [roomRes, assetRes] = await Promise.all([
-          axios.get(`http://localhost:8080/rooms/${id}/detail`, { withCredentials: true }),
+          axios.get(`http://localhost:8080/room/${id}/detail`, { withCredentials: true }),
           axios.get("http://localhost:8080/assets/all", { withCredentials: true }),
         ]);
 
@@ -344,14 +344,14 @@ function RoomDetail() {
 
                   // 🟢 2. ส่ง request อัปเดต asset ในห้อง
                   await axios.put(
-                    `http://localhost:8080/rooms/${id}/assets`,
+                    `http://localhost:8080/room/${id}/assets`,
                     selectedIds,
                     { withCredentials: true }
                   );
 
                   // 🟢 3. อัปเดตข้อมูลพื้นฐานของห้อง
                   await axios.put(
-                    `http://localhost:8080/rooms/${id}`,
+                    `http://localhost:8080/room/${id}`,
                     {
                       roomFloor: form.roomFloor,
                       roomNumber: form.roomNumber,
@@ -362,7 +362,7 @@ function RoomDetail() {
 
                   // 🟢 4. โหลดข้อมูลใหม่ (refresh)
                   const refreshed = await axios.get(
-                    `http://localhost:8080/rooms/${id}/detail`,
+                    `http://localhost:8080/room/${id}/detail`,
                     { withCredentials: true }
                   );
                   setRoomData(refreshed.data);

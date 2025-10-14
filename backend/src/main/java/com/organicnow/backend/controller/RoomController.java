@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@RequestMapping("/room")
 @RequiredArgsConstructor
 @CrossOrigin(
         origins = {"http://localhost:5173", "http://localhost:3000"},
@@ -41,6 +42,12 @@ public class RoomController {
         List<RoomDetailDto> rooms = roomService.getAllRooms();
         if (rooms.isEmpty()) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(rooms);
+    }
+
+    // ✅ ดึงข้อมูลห้องทั้งหมด (สำหรับ /rooms endpoint)
+    @GetMapping("/list")
+    public ResponseEntity<List<RoomDetailDto>> getAllRoomsList() {
+        return getAllRooms();
     }
 
     // ✅ เพิ่ม Asset เข้า Room
