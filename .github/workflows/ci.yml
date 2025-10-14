@@ -2,9 +2,9 @@ name: CI - Frontend & Backend Tests
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -71,6 +71,37 @@ jobs:
         with:
           name: jacoco-xml
           path: backend/target/site/jacoco/jacoco.xml
+
+      - name:
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres123
+          run: |
+            nohup ./mvnw -q -DskipTests spring-boot:run &
+            for i in {1..60}; do
+            curl -fsS http://localhost:8080/actuator/health && break
+            echo "Waiting for Spring Boot... ($i/60)"
+            sleep 2
+            done
+
+      - name: Generate OpenAPI (openapi.json)
+        run: |
+          curl -fsS "http://localhost:8080/api/v3/api-docs" -o target/openapi.json || \
+          curl -fsS "http://localhost:8080/v3/api-docs" -o target/openapi.json
+          test -s target/openapi.json || (echo "openapi.json is empty" && exit 1)
+
+      - name: Upload OpenAPI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-json
+          path: backend/target/openapi.json
+
+      - name: Stop app
+        if: always()
+        run: |
+          kill $(lsof -t -i:8080) 2>/dev/null || true
 
   e2e:
     name: E2E via docker-compose + Cypress (root)
@@ -147,7 +178,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Build & Push Frontend Image
     runs-on: ubuntu-latest
-    needs: [backend, e2e]
+    needs: [ backend, e2e ]
     env:
       IMAGE_NAME: heangkung/organicnow-frontend
       TAG_SHA: ${{ github.sha }}
@@ -181,7 +212,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Build & Push Backend Image
     runs-on: ubuntu-latest
-    needs: [backend, e2e]
+    needs: [ backend, e2e ]
     env:
       IMAGE_NAME: heangkung/organicnow-backend
       TAG_SHA: ${{ github.sha }}
@@ -214,6 +245,6 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [backend, e2e, docker-push-frontend, docker-push-backend]
+    needs: [ backend, e2e, docker-push-frontend, docker-push-backend ]
     steps:
       - run: echo "Backend tests + E2E (compose) + Push frontend & backend images finished."
