@@ -60,12 +60,10 @@ function MaintenanceRequest() {
         const json = await res.json();
         if (Array.isArray(json) && json.length > 0) {
           setRooms(json);
-          console.log("✅ Rooms loaded for maintenance");
         } else {
           setRooms([]);
         }
       } else {
-        console.log("❌ Room API failed:", res.status);
         setRooms([]);
       }
     } catch (e) {
@@ -234,13 +232,6 @@ function MaintenanceRequest() {
       form.issue &&
       form.requestDate;
     
-    console.log("🔍 Form validation:", {
-      room: form.room,
-      target: form.target,
-      issue: form.issue,
-      requestDate: form.requestDate,
-      isValid: valid
-    });
     
     return valid;
   }, [form.room, form.target, form.issue, form.requestDate]);
@@ -307,8 +298,6 @@ function MaintenanceRequest() {
         technicianPhone: form.phone,
       };
 
-      console.log("🚀 Creating maintenance request:", payload);
-
       const res = await fetch(`${API_BASE}/maintain/create`, {
         method: "POST",
         credentials: "include",
@@ -323,8 +312,6 @@ function MaintenanceRequest() {
       }
 
       const result = await res.json();
-      console.log("✅ Create success:", result);
-
       // ✅ รอ 500ms ก่อน fetch ใหม่เพื่อให้ database commit เสร็จ
       await new Promise(resolve => setTimeout(resolve, 500));
       await fetchData();

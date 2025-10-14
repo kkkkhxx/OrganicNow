@@ -5,7 +5,48 @@ CREATE TABLE IF NOT EXISTS room (
     status VARCHAR(20) DEFAULT 'available'
     );
 
+-- Create asset_group table (required for maintenance_schedule)
+CREATE TABLE IF NOT EXISTS asset_group (
+    asset_group_id SERIAL PRIMARY KEY,
+    asset_group_name VARCHAR(100) NOT NULL UNIQUE
+);
+
+-- Create maintenance_schedule table
+CREATE TABLE IF NOT EXISTS maintenance_schedule (
+    schedule_id SERIAL PRIMARY KEY,
+    schedule_scope INTEGER NOT NULL CHECK (schedule_scope IN (0, 1)),
+    asset_group_id BIGINT,
+    cycle_month INTEGER NOT NULL CHECK (cycle_month >= 1),
+    last_done_date TIMESTAMP,
+    next_due_date TIMESTAMP,
+    notify_before_date INTEGER,
+    schedule_title VARCHAR(200) NOT NULL,
+    schedule_description TEXT,
+    FOREIGN KEY (asset_group_id) REFERENCES asset_group(asset_group_id) ON DELETE SET NULL
+);
+
+-- Create notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    message TEXT,
+    type VARCHAR(50),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP,
+    maintenance_schedule_id BIGINT,
+    FOREIGN KEY (maintenance_schedule_id) REFERENCES maintenance_schedule(schedule_id) ON DELETE SET NULL
+);
+
 TRUNCATE TABLE room RESTART IDENTITY;
+
+-- Insert sample asset groups
+INSERT INTO asset_group (asset_group_name) VALUES 
+    ('Asset'),
+    ('Building'),
+    ('Electrical'),
+    ('Plumbing'),
+    ('HVAC');
 
 DO $$
 DECLARE

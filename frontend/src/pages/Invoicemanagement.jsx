@@ -37,25 +37,15 @@ function InvoiceManagement() {
   // สำหรับ dropdown ห้อง (ใช้ข้อมูลจาก backend เท่านั้น)
   const roomsByFloor = useMemo(() => {
     if (!rooms || rooms.length === 0) {
-      console.log("⚠️ No rooms from API");
       return {};
     }
 
     const result = {};
-    console.log("🏗️ Processing rooms from API:", rooms);
     
     rooms.forEach((room, index) => {
       // ใช้ field names ที่ถูกต้องจาก API response จริง
       const floor = room.roomFloor;  // field จริงจาก API
       const roomNumber = room.roomNumber;  // field จริงจาก API
-      
-      if (index < 3) { // แสดง 3 ตัวแรกเป็นตัวอย่าง
-        console.log(`🔍 Room ${index}:`, {
-          roomFloor: floor,
-          roomNumber: roomNumber,
-          roomId: room.roomId
-        });
-      }
       
       if (floor !== undefined && floor !== null && roomNumber !== undefined && roomNumber !== null) {
         const floorStr = String(floor);
@@ -65,7 +55,6 @@ function InvoiceManagement() {
       }
     });
     
-    console.log("📋 Final roomsByFloor result:", result);
     return result;
   }, [rooms]);
 
@@ -155,16 +144,12 @@ function InvoiceManagement() {
       });
       if (res.ok) {
         const json = await res.json();
-        console.log("🏠 Rooms from API:", json); // Debug log
         if (Array.isArray(json) && json.length > 0) {
           setRooms(json);
-          console.log("✅ Rooms loaded successfully from API");
         } else {
-          console.log("⚠️ Empty rooms array from API");
           setRooms([]);
         }
       } else {
-        console.log("❌ Room API failed:", res.status);
         // ใช้ fallback หาก API ล้มเหลว
         setRooms([]);
       }
@@ -184,10 +169,8 @@ function InvoiceManagement() {
       });
       if (res.ok) {
         const json = await res.json();
-        console.log("📄 Contracts from API:", json); // Debug log
         setContracts(Array.isArray(json) ? json : []);
       } else {
-        console.log("❌ Contract API failed:", res.status);
         setContracts([]);
       }
     } catch (e) {
@@ -205,12 +188,10 @@ function InvoiceManagement() {
       });
       if (res.ok) {
         const json = await res.json();
-        console.log("👥 Tenants from API:", json); // Debug log
         // tenant/list ส่ง object {results: [...]} ไม่ใช่ array โดยตรง
         const tenantArray = json.results || json;
         setTenants(Array.isArray(tenantArray) ? tenantArray : []);
       } else {
-        console.log("❌ Tenant API failed:", res.status);
         setTenants([]);
       }
     } catch (e) {
@@ -228,10 +209,8 @@ function InvoiceManagement() {
       });
       if (res.ok) {
         const json = await res.json();
-        console.log("📦 Packages from API:", json);
         setPackages(Array.isArray(json) ? json : []);
       } else {
-        console.log("❌ Package API failed:", res.status);
         setPackages([]);
       }
     } catch (e) {
@@ -450,7 +429,7 @@ function InvoiceManagement() {
   const [selectedItems, setSelectedItems] = useState([]);
 
   const handleUpdate = (item) => {
-    console.log("Update: ", item);
+    // Update functionality
   };
 
   // ✅ ลบใบแจ้งหนี้ (DELETE /invoice/delete/{id})
@@ -547,17 +526,12 @@ function InvoiceManagement() {
         // subTotal / netAmount: ให้ backend คำนวณเอง
       };
 
-      console.log("🚀 Sending invoice data:", body);
-      console.log("📋 Current form state:", invForm);
-
       const res = await fetch(`${API_BASE}/invoice/create`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
-      console.log("📡 Response status:", res.status);
 
       if (!res.ok) {
         const t = await res.text().catch(() => "");
@@ -566,8 +540,6 @@ function InvoiceManagement() {
       }
 
       const result = await res.json();
-      console.log("✅ Backend response:", result);
-      console.log("🔍 Response details - floor:", result.floor, "room:", result.room, "rent:", result.rent);
 
       // เพิ่มข้อมูลใหม่เข้า state โดยตรง (optimistic update)
       const newInvoice = {
@@ -655,7 +627,6 @@ function InvoiceManagement() {
                       onClick={() => {
                         // ✅ Refresh packages data เมื่อเปิด modal
                         fetchPackages();
-                        console.log("🔄 Refreshing packages before creating invoice");
                       }}
                     >
                       <i className="bi bi-plus-lg me-1"></i> Create Invoice

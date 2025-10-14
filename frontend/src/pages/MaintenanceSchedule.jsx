@@ -4,6 +4,8 @@ import Layout from "../component/layout";
 import Modal from "../component/modal";
 import Pagination from "../component/pagination";
 import { pageSize as defaultPageSize } from "../config_variable";
+import { useNotifications } from "../contexts/NotificationContext";
+import { useToast } from "../contexts/ToastContext";
 import * as bootstrap from "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -22,6 +24,9 @@ const addMonthsISO = (isoDate, months) => {
     const dd = String(dt.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
 };
+
+// Convert date to LocalDateTime format for backend
+const d2ldt = (d) => (d ? `${d}T00:00:00` : null);
 
 // ล้างซาก Backdrop + class บน body (เผื่อ modal/offcanvas ค้าง)
 const cleanupBackdrops = () => {
@@ -95,6 +100,10 @@ function MaintenanceSchedule() {
     const [schedules, setSchedules] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+
+    // notification context สำหรับ refresh
+    const { refreshNotifications } = useNotifications();
+    const { showMaintenanceCreated } = useToast();
 
     // assetGroupDropdown (จาก /schedules)
     const [assetOptions, setAssetOptions] = useState([]);
@@ -194,7 +203,19 @@ function MaintenanceSchedule() {
             const msg = await res.text().catch(() => "");
             throw new Error(`HTTP ${res.status} ${msg || ""}`.trim());
         }
+        
+        const newSchedule = await res.json();
         await loadSchedules();
+        
+        // 🎯 แสดง toast เมื่อสร้าง schedule สำเร็จ
+        showMaintenanceCreated({
+            scheduleTitle: newSch.title
+        });
+        
+        // 🔔 Refresh notifications หลังจากสร้าง schedule ใหม่
+        setTimeout(() => {
+            refreshNotifications();
+        }, 1000); // รอ 1 วินาทีให้ backend สร้าง notification เสร็จก่อน
     };
 
     const clearFilters = () =>
@@ -280,6 +301,8 @@ function MaintenanceSchedule() {
             alert("ลบไม่สำเร็จ");
         }
     };
+
+
 
     const hasAnyFilter =
         filters.scope !== "ALL" ||

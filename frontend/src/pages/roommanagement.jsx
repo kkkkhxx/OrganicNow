@@ -23,7 +23,7 @@ function RoomManagement() {
   // ✅ โหลดข้อมูลห้องจาก backend
   const fetchRooms = async () => {
     try {
-      const res = await axios.get(`${apiPath}/rooms`, {
+      const res = await axios.get(`${apiPath}/room/list`, {
         withCredentials: true,
       });
       if (Array.isArray(res.data)) {

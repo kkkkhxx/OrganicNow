@@ -1,7 +1,9 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { ToastProvider } from './component/Toast.jsx';
+import { NotificationProvider } from './contexts/NotificationContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { ToastProvider as PrimeToastProvider } from './component/Toast.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Import pages
@@ -25,99 +27,103 @@ function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <Router>
-          <Routes>
-            {/* ✅ Public Route - Only Login */}
-            <Route path="/login" element={<Login />} />
-            
-            {/* ✅ Protected Routes - All other routes require authentication */}
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Navigate to="/dashboard" replace />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/roommanagement" element={
-              <ProtectedRoute>
-                <RoomManagement />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/tenantmanagement" element={
-              <ProtectedRoute>
-                <TenantManagement />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/invoicemanagement" element={
-              <ProtectedRoute>
-                <InvoiceManagement />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/maintenancerequest" element={
-              <ProtectedRoute>
-                <MaintenanceRequest />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/assetmanagement" element={
-              <ProtectedRoute>
-                <AssetManagement />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/packagemanagement" element={
-              <ProtectedRoute>
-                <PackageManagement />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/maintenanceschedule" element={
-              <ProtectedRoute>
-                <MaintenanceSchedule />
-              </ProtectedRoute>
-            } />
-            
-            {/* ✅ Detail Pages - All protected */}
-            <Route path="/tenantdetail" element={
-              <ProtectedRoute>
-                <TenantDetail />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/roomdetail" element={
-              <ProtectedRoute>
-                <RoomDetail />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/invoicedetails" element={
-              <ProtectedRoute>
-                <InvoiceDetails />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/maintenancedetails" element={
-              <ProtectedRoute>
-                <MaintenanceDetails />
-              </ProtectedRoute>
-            } />
-            
-            {/* ✅ Fallback - Any unknown route redirects to login */}
-            <Route path="*" element={
-              <ProtectedRoute>
-                <Navigate to="/dashboard" replace />
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
+        <NotificationProvider>
+          <PrimeToastProvider>
+            <Router>
+              <Routes>
+                {/* ✅ Public Route - Only Login */}
+                <Route path="/login" element={<Login />} />
+                
+                {/* ✅ Protected Routes - All other routes require authentication */}
+                <Route path="/" element={
+                  <ProtectedRoute>
+                    <Navigate to="/dashboard" replace />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/roommanagement" element={
+                  <ProtectedRoute>
+                    <RoomManagement />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/tenantmanagement" element={
+                  <ProtectedRoute>
+                    <TenantManagement />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/invoicemanagement" element={
+                  <ProtectedRoute>
+                    <InvoiceManagement />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/maintenancerequest" element={
+                  <ProtectedRoute>
+                    <MaintenanceRequest />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/assetmanagement" element={
+                  <ProtectedRoute>
+                    <AssetManagement />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/packagemanagement" element={
+                  <ProtectedRoute>
+                    <PackageManagement />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/maintenanceschedule" element={
+                  <ProtectedRoute>
+                    <MaintenanceSchedule />
+                  </ProtectedRoute>
+                } />
+                
+                {/* ✅ Detail Pages - All protected */}
+                <Route path="/tenantdetail" element={
+                  <ProtectedRoute>
+                    <TenantDetail />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/roomdetail" element={
+                  <ProtectedRoute>
+                    <RoomDetail />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/invoicedetails" element={
+                  <ProtectedRoute>
+                    <InvoiceDetails />
+                  </ProtectedRoute>
+                } />
+                
+                <Route path="/maintenancedetails" element={
+                  <ProtectedRoute>
+                    <MaintenanceDetails />
+                  </ProtectedRoute>
+                } />
+                
+                {/* ✅ Fallback - Any unknown route redirects to login */}
+                <Route path="*" element={
+                  <ProtectedRoute>
+                    <Navigate to="/dashboard" replace />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </Router>
+          </PrimeToastProvider>
+        </NotificationProvider>
       </ToastProvider>
     </AuthProvider>
   );

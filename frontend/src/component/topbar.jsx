@@ -6,13 +6,14 @@ import { Menu } from "primereact/menu";
 import { profileMenuItems, settingsMenuItems } from "./menuitem";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 
 import "primereact/resources/themes/lara-light-indigo/theme.css";
 import "primereact/resources/primereact.min.css";
 import "primeicons/primeicons.css";
 import "../assets/css/topbar.css";
 
-export default function Topbar({ notifications = 0, title = "", icon = "" }) {
+export default function Topbar({ title = "", icon = "" }) {
   const profileMenu = useRef(null);
   const settingsMenu = useRef(null);
   const { logout, user } = useAuth();
@@ -49,17 +50,7 @@ export default function Topbar({ notifications = 0, title = "", icon = "" }) {
 
         {/* Right: Bell + Cog + Profile */}
         <div className="topbar-right">
-          <div className="p-overlay-badge">
-            <Button
-              icon="pi pi-bell"
-              className="p-button-rounded p-button-text topbar-btn"
-              aria-label="Notifications"
-              tooltip="Notifications"
-              tooltipOptions={{ position: "bottom" }}
-              onClick={() => console.log("Notifications clicked")}
-            />
-            {notifications > 0 && <Badge value={notifications} severity="danger" />}
-          </div>
+          <NotificationBell />
 
           <span>
             <Button
