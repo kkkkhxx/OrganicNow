@@ -39,6 +39,8 @@ function AssetManagement() {
   const [formGroupId, setFormGroupId] = useState("");
   const [editingAssetId, setEditingAssetId] = useState(null);
 
+  const [formQty, setFormQty] = useState(1);
+
   const {
     showMessagePermission,
     showMessageError,
@@ -116,15 +118,22 @@ function AssetManagement() {
     const q = search.trim().toLowerCase();
     let rows = [...assets];
 
+    // ✅ กรองตาม Group ที่เลือก
     if (selectedGroupId !== "ALL") {
       const group = assetGroups.find(
         (g) => String(g.id) === String(selectedGroupId)
       );
+
       if (group) {
-        rows = rows.filter((r) => r.assetType === group.assetGroupName);
+        rows = rows.filter(
+          (r) =>
+            (r.assetType || "").trim().toLowerCase() ===
+            (group.assetGroupName || "").trim().toLowerCase()
+        );
       }
     }
 
+    // ✅ กรองตามคำค้นหา (search)
     if (q) {
       rows = rows.filter(
         (r) =>
@@ -133,6 +142,7 @@ function AssetManagement() {
       );
     }
 
+    // ✅ เรียงลำดับชื่อ (A-Z / Z-A)
     rows.sort((a, b) =>
       sortAsc
         ? a.assetName.localeCompare(b.assetName)
@@ -267,34 +277,49 @@ function AssetManagement() {
 
   // ========= CRUD Asset =========
   const handleSaveAsset = async () => {
-    const payload = {
-      assetName: formName,
-      assetGroup: { id: parseInt(formGroupId) },
-    };
-
-    if (!checkValidationAsset(payload)) return;
+    if (!formName || !formGroupId) {
+      showMessageError("กรุณากรอกชื่อและเลือกกลุ่ม");
+      return;
+    }
 
     try {
       setSaving(true);
-      if (editingAssetId == null) {
-        await axios.post(`${apiPath}/assets/create`, payload, {
+
+      // ✅ ถ้ามีการกรอก quantity และมากกว่า 1 → ใช้ bulk
+      if (editingAssetId == null && parseInt(formQty) > 1) {
+        await axios.post(`${apiPath}/assets/bulk`, null, {
+          params: {
+            assetGroupId: parseInt(formGroupId),
+            name: formName.trim(),
+            qty: parseInt(formQty),
+          },
           withCredentials: true,
         });
+        showMessageSave(`สร้าง ${formQty} ชิ้นสำเร็จ`);
+      } 
+      // ✅ ถ้าจำนวน = 1 → ใช้ create เดิม
+      else if (editingAssetId == null) {
+        await axios.post(`${apiPath}/assets/create`, {
+          assetName: formName.trim(),
+          assetGroup: { id: parseInt(formGroupId) },
+        }, { withCredentials: true });
         showMessageSave("สร้าง Asset สำเร็จ");
-      } else {
-        await axios.put(`${apiPath}/assets/update/${editingAssetId}`, payload, {
-          withCredentials: true,
-        });
+      } 
+      // ✅ ถ้าเป็นการแก้ไข
+      else {
+        await axios.put(`${apiPath}/assets/update/${editingAssetId}`, {
+          assetName: formName.trim(),
+          assetGroup: { id: parseInt(formGroupId) },
+        }, { withCredentials: true });
         showMessageSave("แก้ไข Asset สำเร็จ");
       }
+
       fetchData(currentPage);
       document.getElementById("modalAsset_btnClose")?.click();
+
     } catch (err) {
-      if (err.response?.status === 401) {
-        showMessagePermission();
-      } else {
-        showMessageError("บันทึก Asset ไม่สำเร็จ");
-      }
+      console.error("Error saving asset:", err);
+      showMessageError("เกิดข้อผิดพลาดในการบันทึก");
     } finally {
       setSaving(false);
     }
@@ -593,6 +618,17 @@ function AssetManagement() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="mb-3">
+            <label className="form-label">Quantity (optional)</label>
+            <input
+              type="number"
+              className="form-control"
+              min="1"
+              value={formQty}
+              onChange={(e) => setFormQty(e.target.value)}
+              disabled={!!editingAssetId} // ใช้ได้เฉพาะตอนสร้างใหม่
+            />
           </div>
           <div className="d-flex justify-content-center gap-3 pt-3 pb-2">
             <button

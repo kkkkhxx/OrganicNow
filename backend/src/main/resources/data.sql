@@ -51,51 +51,83 @@ INSERT INTO contract (room_id, tenant_id, package_id, sign_date, start_date, end
 -- ========================
 -- Invoice
 -- ========================
--- Somchai (Contract 1)
 INSERT INTO invoice (contract_id, create_date, due_date, invoice_status, pay_date, pay_method, sub_total, penalty_total, net_amount) VALUES
                                                                                                                                          (1, '2025-02-01', '2025-02-05', 1, '2025-02-03', 1,  8000, 0,  8000),
                                                                                                                                          (1, '2025-03-01', '2025-03-05', 1, '2025-03-04', 1,  8000, 0,  8000),
-                                                                                                                                         (1, '2025-04-01', '2025-04-05', 1, '2025-04-02', 1,  8000, 0,  8000)
-    ON CONFLICT (invoice_id) DO NOTHING;
-
--- Suda (Contract 2)
-INSERT INTO invoice (contract_id, create_date, due_date, invoice_status, pay_date, pay_method, sub_total, penalty_total, net_amount) VALUES
+                                                                                                                                         (1, '2025-04-01', '2025-04-05', 1, '2025-04-02', 1,  8000, 0,  8000),
                                                                                                                                          (2, '2025-02-01', '2025-02-05', 1, '2025-02-05', 2, 15000, 0, 15000),
                                                                                                                                          (2, '2025-03-01', '2025-03-05', 1, '2025-03-03', 2, 15000, 0, 15000),
-                                                                                                                                         (2, '2025-04-01', '2025-04-05', 0, NULL, NULL, 15000, 0, 15000)
-    ON CONFLICT (invoice_id) DO NOTHING;
-
--- Anan (Contract 3)
-INSERT INTO invoice (contract_id, create_date, due_date, invoice_status, pay_date, pay_method, sub_total, penalty_total, net_amount, penalty_applied_at) VALUES
-                                                                                                                                                             (3, '2025-02-01', '2025-02-05', 1, '2025-02-04', 1, 21000, 0, 21000, NULL),
-                                                                                                                                                             (3, '2025-03-01', '2025-03-05', 1, '2025-03-15', 1, 21000, 500, 21500, '2025-03-10'),
-                                                                                                                                                             (3, '2025-04-01', '2025-04-05', 0, NULL, NULL, 21000, 0, 21000, NULL)
+                                                                                                                                         (2, '2025-04-01', '2025-04-05', 0, NULL, NULL, 15000, 0, 15000),
+                                                                                                                                         (3, '2025-02-01', '2025-02-05', 1, '2025-02-04', 1, 21000, 0, 21000),
+                                                                                                                                         (3, '2025-03-01', '2025-03-05', 1, '2025-03-15', 1, 21000, 500, 21500),
+                                                                                                                                         (3, '2025-04-01', '2025-04-05', 0, NULL, NULL, 21000, 0, 21000)
     ON CONFLICT (invoice_id) DO NOTHING;
 
 -- ========================
 -- Asset Group
 -- ========================
-INSERT INTO asset_group (asset_group_name) VALUES
-                                               ('เครื่องใช้ไฟฟ้า'),
-                                               ('เฟอร์นิเจอร์'),
-                                               ('สุขภัณฑ์')
+INSERT INTO asset_group (asset_group_name)
+VALUES ('เครื่องใช้ไฟฟ้า'), ('เฟอร์นิเจอร์'), ('สุขภัณฑ์')
     ON CONFLICT (asset_group_name) DO NOTHING;
+
+-- ========================
+-- Generate Assets Dynamically (fixed syntax)
+-- ========================
+-- เฟอร์นิเจอร์
+INSERT INTO asset (asset_group_id, asset_name, status)
+SELECT 2, 'bed-' || LPAD(gs::text, 3, '0'), 'available' FROM generate_series(1, 24) AS gs
+UNION ALL
+SELECT 2, 'table-' || LPAD(gs::text, 3, '0'), 'available' FROM generate_series(1, 24) AS gs
+UNION ALL
+SELECT 2, 'chair-' || LPAD(gs::text, 3, '0'), 'available' FROM generate_series(1, 24) AS gs
+UNION ALL
+SELECT 2, 'wardrobe-' || LPAD(gs::text, 3, '0'), 'available' FROM generate_series(1, 24) AS gs
+    ON CONFLICT DO NOTHING;
+
+-- เครื่องใช้ไฟฟ้า
+INSERT INTO asset (asset_group_id, asset_name, status)
+SELECT 1, 'bulb-' || LPAD(gs::text, 3, '0'), 'available'
+FROM generate_series(1, 50) AS gs
+    ON CONFLICT DO NOTHING;
+
+-- สุขภัณฑ์
+INSERT INTO asset (asset_group_id, asset_name, status)
+SELECT 3, 'toilet-' || LPAD(gs::text, 3, '0'), 'available'
+FROM generate_series(1, 24) AS gs
+    ON CONFLICT DO NOTHING;
+
+-- ========================
+-- Assign Asset to Each Room
+-- ========================
+INSERT INTO room_asset (room_id, asset_id)
+SELECT r.room_id, a.asset_id
+FROM room r
+         JOIN asset a ON (
+    a.asset_name IN (
+                     'bed-' || LPAD(r.room_id::text, 3, '0'),
+                     'table-' || LPAD(r.room_id::text, 3, '0'),
+                     'chair-' || LPAD(r.room_id::text, 3, '0'),
+                     'wardrobe-' || LPAD(r.room_id::text, 3, '0')
+        )
+    )
+    ON CONFLICT DO NOTHING;
 
 -- ========================
 -- Maintain
 -- ========================
--- ✅ ลบ maintain_id ออกเพื่อให้ใช้ AUTO INCREMENT
-INSERT INTO maintain (target_type, room_id, room_asset_id, issue_category, issue_title, issue_description, create_date, scheduled_date, finish_date, maintain_type, technician_name, technician_phone) VALUES
-    (0, 1, NULL, 1, 'Air conditioner - Fix', 'แอร์ไม่เย็น มีเสียงดัง', '2025-03-11 00:00:00', '2025-03-14 09:00:00', NULL, 'Fix', 'PSomchai', '012-345-6789'),
-    (1, 2, NULL, 0, 'Wall - Fix', 'ผนังร้าวเล็กน้อย', '2025-02-28 00:00:00', '2025-02-28 10:00:00', '2025-02-28 16:00:00', 'Fix', 'Anan', '081-234-5678'),
-    (0, 15, NULL, 1, 'Light - Shift', 'ย้ายตำแหน่งโคมไฟ', '2025-02-28 00:00:00', '2025-02-28 13:00:00', '2025-02-28 15:00:00', 'Shift', 'PSomchai', '012-345-6789')
-ON CONFLICT DO NOTHING;
+INSERT INTO maintain (target_type, room_id, issue_category, issue_title, issue_description, create_date, scheduled_date, finish_date) VALUES
+                                                                                                                                          (0, 1, 1, 'Air conditioner - Fix', 'แอร์ไม่เย็น มีเสียงดัง', '2025-03-11', '2025-03-14 09:00:00', NULL),
+                                                                                                                                          (1, 2, 0, 'Wall - Fix', 'ผนังร้าวเล็กน้อย', '2025-02-28', '2025-02-28 10:00:00', '2025-02-28 16:00:00'),
+                                                                                                                                          (0, 15, 1, 'Light - Shift', 'ย้ายตำแหน่งโคมไฟ', '2025-02-28', '2025-02-28 13:00:00', '2025-02-28 15:00:00')
+    ON CONFLICT DO NOTHING;
 
 -- ========================
 -- Maintenance Schedule
 -- ========================
-INSERT INTO maintenance_schedule (schedule_scope, room_id, room_asset_id, cycle_month, last_done_date, next_due_date, notify_before_date, schedule_title, schedule_description) VALUES
-                                                                                                                                                                                    (0, 1, NULL, 6, '2025-01-01', '2025-07-01', 7, 'ตรวจแอร์', 'ตรวจเช็คและทำความสะอาดแอร์'),
-                                                                                                                                                                                    (1, 2, NULL, 12, '2025-01-10', '2026-01-10', 14, 'ตรวจสภาพห้อง', 'ตรวจสอบรอยร้าว พื้น เพดาน'),
-                                                                                                                                                                                    (0, 3, NULL, 3, '2025-02-01', '2025-05-01', 3, 'ตรวจหลอดไฟ', 'ตรวจสอบและเปลี่ยนหลอดไฟ')
+INSERT INTO maintenance_schedule
+(schedule_scope, asset_group_id, cycle_month, last_done_date, next_due_date, notify_before_date, schedule_title, schedule_description)
+VALUES
+    (0, 1, 6, '2025-01-01', '2025-07-01', 7, 'ตรวจแอร์', 'ตรวจเช็คและทำความสะอาดแอร์'),
+    (1, 2, 12, '2025-01-10', '2026-01-10', 14, 'ตรวจสภาพห้อง', 'ตรวจสอบรอยร้าว พื้น เพดาน'),
+    (0, 3, 3, '2025-02-01', '2025-05-01', 3, 'ตรวจหลอดไฟ', 'ตรวจสอบและเปลี่ยนหลอดไฟ')
     ON CONFLICT DO NOTHING;

@@ -13,11 +13,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/schedules")
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RequiredArgsConstructor
 public class MaintenanceScheduleController {
 
     private final MaintenanceScheduleService scheduleService;
-    private final AssetGroupService assetGroupService;
+    private final AssetGroupService   assetGroupService;
 
     /** ✅ สร้าง schedule ใหม่ */
     @PostMapping

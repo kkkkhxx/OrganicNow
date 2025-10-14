@@ -21,25 +21,24 @@ public class MaintenanceSchedule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "schedule_id")
-    private Long id; // schedule_id (PK)
+    private Long id;
 
-    @Min(0) @Max(1)
+    @Min(0)
+    @Max(1)
     @Column(name = "schedule_scope", nullable = false)
-    private Integer scheduleScope;
+    private Integer scheduleScope; // 0 = เฉพาะกลุ่ม, 1 = ทั้งระบบ (ตัวอย่าง)
 
-    // FK -> Room
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id", nullable = false, foreignKey = @ForeignKey(name = "fk_schedule_room"))
-    private Room room;
-
-    // FK -> RoomAsset (อาจว่างได้ ถ้า scope เป็นทั้งห้อง)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_asset_id", foreignKey = @ForeignKey(name = "fk_schedule_room_asset"))
-    private RoomAsset roomAsset;
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(
+            name = "asset_group_id",
+            nullable = true,
+            foreignKey = @ForeignKey(name = "fk_schedule_asset_group")
+    )
+    private AssetGroup assetGroup;
 
     @Min(1)
     @Column(name = "cycle_month", nullable = false)
-    private Integer cycleMonth; // ตรวจทุกๆกี่เดือน
+    private Integer cycleMonth; // ตรวจทุกๆ กี่เดือน
 
     @Column(name = "last_done_date")
     private LocalDateTime lastDoneDate; // เวลาล่าสุดที่ตรวจ

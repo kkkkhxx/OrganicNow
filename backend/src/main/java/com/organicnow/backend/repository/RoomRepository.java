@@ -10,38 +10,40 @@ import java.util.List;
 
 public interface RoomRepository extends JpaRepository<Room, Long> {
 
+    // ✅ ดึงห้องทั้งหมดพร้อม tenant และสถานะ
     @Query("""
-    SELECT new com.organicnow.backend.dto.RoomDetailDto(
-        r.id, r.roomNumber, r.roomFloor,
-        CASE WHEN c.id IS NOT NULL THEN 'occupied' ELSE 'available' END,
-        COALESCE(t.firstName, ''), COALESCE(t.lastName, ''),
-        COALESCE(t.phoneNumber, ''), COALESCE(t.email, ''),
-        COALESCE(ct.name, ''), c.signDate, c.startDate, c.endDate
-    )
-    FROM Room r
-    LEFT JOIN Contract c ON r.id = c.room.id AND c.status = 1
-    LEFT JOIN Tenant t ON c.tenant.id = t.id
-    LEFT JOIN PackagePlan p ON c.packagePlan.id = p.id
-    LEFT JOIN ContractType ct ON p.contractType.id = ct.id
-""")
+        SELECT new com.organicnow.backend.dto.RoomDetailDto(
+            r.id, r.roomNumber, r.roomFloor,
+            CASE WHEN c.id IS NOT NULL THEN 'occupied' ELSE 'available' END,
+            COALESCE(t.firstName, ''), COALESCE(t.lastName, ''),
+            COALESCE(t.phoneNumber, ''), COALESCE(t.email, ''),
+            COALESCE(ct.name, ''), c.signDate, c.startDate, c.endDate
+        )
+        FROM Room r
+        LEFT JOIN Contract c ON r.id = c.room.id AND c.status = 1
+        LEFT JOIN Tenant t ON c.tenant.id = t.id
+        LEFT JOIN PackagePlan p ON c.packagePlan.id = p.id
+        LEFT JOIN ContractType ct ON p.contractType.id = ct.id
+        ORDER BY r.roomFloor, r.roomNumber
+    """)
     List<RoomDetailDto> findAllRooms();
 
-
+    // ✅ ดึงห้องตาม id
     @Query("""
-    SELECT new com.organicnow.backend.dto.RoomDetailDto(
-        r.id, r.roomNumber, r.roomFloor,
-        CASE WHEN c.id IS NOT NULL THEN 'occupied' ELSE 'available' END,
-        COALESCE(t.firstName, ''), COALESCE(t.lastName, ''),
-        COALESCE(t.phoneNumber, ''), COALESCE(t.email, ''),
-        COALESCE(ct.name, ''), c.signDate, c.startDate, c.endDate
-    )
-    FROM Room r
-    LEFT JOIN Contract c ON r.id = c.room.id AND c.status = 1
-    LEFT JOIN Tenant t ON c.tenant.id = t.id
-    LEFT JOIN PackagePlan p ON c.packagePlan.id = p.id
-    LEFT JOIN ContractType ct ON p.contractType.id = ct.id
-    WHERE r.id = :roomId
-""")
+        SELECT new com.organicnow.backend.dto.RoomDetailDto(
+            r.id, r.roomNumber, r.roomFloor,
+            CASE WHEN c.id IS NOT NULL THEN 'occupied' ELSE 'available' END,
+            COALESCE(t.firstName, ''), COALESCE(t.lastName, ''),
+            COALESCE(t.phoneNumber, ''), COALESCE(t.email, ''),
+            COALESCE(ct.name, ''), c.signDate, c.startDate, c.endDate
+        )
+        FROM Room r
+        LEFT JOIN Contract c ON r.id = c.room.id AND c.status = 1
+        LEFT JOIN Tenant t ON c.tenant.id = t.id
+        LEFT JOIN PackagePlan p ON c.packagePlan.id = p.id
+        LEFT JOIN ContractType ct ON p.contractType.id = ct.id
+        WHERE r.id = :roomId
+    """)
     RoomDetailDto findRoomDetail(@Param("roomId") Long roomId);
 
     Optional<Room> findByRoomNumber(String roomNumber);

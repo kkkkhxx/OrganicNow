@@ -6,6 +6,7 @@ import { pageSize as defaultPageSize } from "../config_variable";
 import * as bootstrap from "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
+import useMessage from "../component/useMessage";
 
 /* ========= API via fetch ========= */
 const API_BASE = import.meta.env?.VITE_API_URL || "http://localhost:8080";
@@ -173,6 +174,8 @@ function PackageManagement() {
   const [contractTypes, setContractTypes] = useState([]); // [{id,name,months}]
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const { showMessageSave, showMessageError, showMessageConfirmDelete } = useMessage();
+
 
   // ฟอร์มสร้างใหม่ (เลือกจาก contractType)
   const [newPkg, setNewPkg] = useState({
@@ -315,20 +318,6 @@ function PackageManagement() {
         return false;
       if (filters.rentMax !== "" && p.rent > Number(filters.rentMax))
         return false;
-      if (
-        filters.dateFrom &&
-        p.createDate &&
-        p.createDate !== "-" &&
-        p.createDate < filters.dateFrom
-      )
-        return false;
-      if (
-        filters.dateTo &&
-        p.createDate &&
-        p.createDate !== "-" &&
-        p.createDate > filters.dateTo
-      )
-        return false;
       return true;
     });
 
@@ -395,17 +384,24 @@ function PackageManagement() {
 
       await API.createPackage(payload);
 
-      // ✅ ปิด modal แบบชัวร์ (รอให้ fade-out เสร็จ)
+      // ✅ ปิด modal แบบชัวร์
       closeModalSafely("createPackageModal");
 
-      // ✅ ดึงข้อมูลใหม่หลัง modal ปิด
+      // ✅ แจ้งเตือน SweetAlert เมื่อสร้างสำเร็จ
+      showMessageSave("สร้าง Package สำเร็จ!");
+
+      // ✅ โหลดข้อมูลใหม่หลังจากแจ้งเตือน
       setTimeout(() => {
         fetchPackages();
       }, 250);
 
+      // ✅ รีเซ็ตค่า form
       setNewPkg((p) => ({ ...p, rent: 5000, active: true }));
     } catch (e) {
       console.error("createPackage error:", e);
+
+      // ❌ แจ้งเตือน SweetAlert กรณี error
+      showMessageError("เกิดข้อผิดพลาดในการสร้าง Package");
     } finally {
       setSaving(false);
     }
@@ -519,51 +515,42 @@ function PackageManagement() {
             )}
 
             {/* Table */}
-            <div className="table-wrapper mt-3">
-              <table className="table text-nowrap">
+            <div className="table-wrapper mt-3" style={{ overflowX: 'auto' }}>
+              <table className="table text-nowrap w-100">
                 <colgroup>
-                  <col style={{ width: 80 }} />
-                  <col style={{ width: 160 }} />
-                  <col />
-                  <col style={{ width: 120 }} />
+                    <col style={{ width: 80 }} />   {/* Order */}
+                    <col style={{ width: 160 }} />  {/* Package */}
+                    <col style={{ width: 180 }} />  {/* Rent */}
+                    <col style={{ width: 100 }} />  {/* Action */}
                 </colgroup>
 
                 <thead>
-                  <tr>
-                    <th className="text-start align-middle header-color">
-                      Order
-                    </th>
-                    <th className="text-start align-middle header-color">
-                      Package
-                    </th>
-                    <th className="text-start align-middle header-color">
-                      Rent
-                    </th>
-                    <th className="text-center align-middle header-color">
-                      Action
-                    </th>
-                  </tr>
+                <tr>
+                    <th className="text-start align-middle header-color">Order</th>
+                    <th className="text-start align-middle header-color">Package</th>
+                    <th className="text-start align-middle header-color">Rent</th>
+                    <th className="text-end align-middle header-color pe-3">Action</th>
+                </tr>
                 </thead>
                 <tbody>
                   {pageRows.length ? (
                     pageRows.map((item, idx) => (
                       <tr key={item.id}>
-                        <td className="align-middle">
+                        <td className="align-middle text-start">
                           {(currentPage - 1) * pageSize + idx + 1}
                         </td>
-                        <td className="align-middle">
+                        <td className="align-middle text-start">
                           <span
                             className="badge rounded-pill px-3 py-2"
                             style={{ backgroundColor: withColor(item).color }}
                           >
-                            <i className="bi bi-circle-fill me-2"></i>
                             {item.contractTypeName}
                           </span>
                         </td>
-                        <td className="align-middle">
+                        <td className="align-middle text-start">
                           {item.rent.toLocaleString()}
                         </td>
-                        <td className="align-middle text-center">
+                        <td className="align-middle pe-3">
                           <div className="form-check form-switch d-inline-flex">
                             <input
                               className="form-check-input"
@@ -780,29 +767,6 @@ function PackageManagement() {
                   setFilters((f) => ({ ...f, rentMax: e.target.value }))
                 }
                 placeholder="e.g. 6000"
-              />
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label">Create date from</label>
-              <input
-                type="date"
-                className="form-control"
-                value={filters.dateFrom}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }))
-                }
-              />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Create date to</label>
-              <input
-                type="date"
-                className="form-control"
-                value={filters.dateTo}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }))
-                }
               />
             </div>
 

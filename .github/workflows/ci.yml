@@ -72,6 +72,52 @@ jobs:
           name: jacoco-xml
           path: backend/target/site/jacoco/jacoco.xml
 
+      # ----------------------------
+      # ✅ Generate & Upload OpenAPI
+      # ----------------------------
+      - name: Start app (for OpenAPI generation)
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres123
+          # ✅ บังคับ base-path และ exposure สำหรับโปรไฟล์ test
+          MANAGEMENT_ENDPOINTS_WEB_BASE_PATH: /actuator
+          MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+        run: |
+          set -euo pipefail
+          nohup ./mvnw -q -DskipTests spring-boot:run >/dev/null 2>&1 &
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "Spring Boot is UP at /actuator/health ✅"
+              break
+            fi
+            echo "Waiting for Spring Boot... ($i/60)"
+            sleep 2
+            if [ "$i" -eq 60 ]; then
+              echo "Spring Boot not healthy in time ❌"
+              kill $(lsof -t -i:8080) 2>/dev/null || true
+              exit 1
+            fi
+          done
+
+      - name: Generate OpenAPI (openapi.json)
+        run: |
+          curl -fsS "http://localhost:8080/v3/api-docs" -o target/openapi.json || \
+          curl -fsS "http://localhost:8080/v3/api-docs" -o target/openapi.json
+          test -s target/openapi.json || (echo "openapi.json is empty" && exit 1)
+
+      - name: Upload OpenAPI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-json
+          path: backend/target/openapi.json
+
+      - name: Stop app
+        if: always()
+        run: |
+          kill $(lsof -t -i:8080) 2>/dev/null || true
+
   e2e:
     name: E2E via docker-compose + Cypress (root)
     runs-on: ubuntu-latest
@@ -107,12 +153,16 @@ jobs:
 
       - name: Wait for backend to be healthy
         run: |
+          set -euo pipefail
           for i in {1..60}; do
-            curl -fsSL "$HEALTH_URL_BACKEND" && exit 0
+            if curl -fsS "$HEALTH_URL_BACKEND" | grep -q '"status":"UP"'; then
+              echo "Backend healthy ✅"
+              exit 0
+            fi
             echo "Waiting for backend... ($i/60)"
             sleep 2
           done
-          echo "Backend not healthy in time"; docker ps; exit 1
+          echo "Backend not healthy in time ❌"; docker ps; exit 1
 
       - name: Wait for frontend to be up
         run: |
