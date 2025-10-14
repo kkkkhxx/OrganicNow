@@ -80,4 +80,9 @@ public class AssetController {
     public static class UpdateStatusReq {
         private String status;
     }
+
+    @GetMapping
+    public ApiResponse<List<AssetDto>> listAllAssets() {
+        return new ApiResponse<>("success", assetService.getAllAssets());
+    }
 }
