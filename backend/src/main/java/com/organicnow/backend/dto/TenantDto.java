@@ -16,6 +16,7 @@ public class TenantDto {
     private String lastName;
     private String phoneNumber;
     private String email;
+    private String nationalId;
 
     private String room;     // room number
     private Integer floor;   // room floor
@@ -55,6 +56,7 @@ public class TenantDto {
             LocalDateTime endDate,
             String phoneNumber,
             String email,
+            String nationalId,
             Integer status   // 👈 เพิ่มมา
     ) {
         this.contractId = contractId;
@@ -70,6 +72,7 @@ public class TenantDto {
         this.endDate = endDate;
         this.phoneNumber = phoneNumber;
         this.email = email;
+        this.nationalId = nationalId;
         this.status = status;   // 👈 set ค่า
     }
 }

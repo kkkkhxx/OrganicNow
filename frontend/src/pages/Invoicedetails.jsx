@@ -71,6 +71,44 @@ function InvoiceDetails() {
     payDate: initial.payDate || null,
   });
 
+  // ===== Fetch ข้อมูลล่าสุดจาก API =====
+  useEffect(() => {
+    const fetchInvoiceData = async () => {
+      if (!invoiceId && !initial.id) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/invoice/${invoiceId || initial.id}`, {
+          credentials: "include",
+        });
+        
+        if (response.ok) {
+          const apiData = await response.json();
+          console.log("API Invoice Data:", apiData);
+          
+          // อัปเดตด้วยข้อมูลจาก API
+          setInvoiceForm(prev => ({
+            ...prev,
+            rent: Number(apiData.rent) || prev.rent,
+            water: Number(apiData.water) || prev.water,
+            electricity: Number(apiData.electricity) || prev.electricity,
+            waterUnit: Number(apiData.waterUnit) || prev.waterUnit,
+            electricityUnit: Number(apiData.electricityUnit) || prev.electricityUnit,
+            amount: Number(apiData.netAmount || apiData.amount) || prev.amount,
+            penalty: Number(apiData.penaltyTotal || apiData.penalty) || prev.penalty,
+            status: (apiData.invoiceStatus === 1 ? "complete" : 
+                    apiData.invoiceStatus === 2 ? "cancelled" : "pending"),
+            payDate: apiData.payDate ? d2str(apiData.payDate) : prev.payDate,
+            penaltyDate: apiData.penaltyAppliedAt ? d2str(apiData.penaltyAppliedAt) : prev.penaltyDate,
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch invoice data:", error);
+      }
+    };
+
+    fetchInvoiceData();
+  }, [invoiceId, initial.id]);
+
   // ===== helpers =====
   const toNumber = (v) => {
     const n = Number(v);
@@ -102,25 +140,42 @@ function InvoiceDetails() {
     return s.length >= 10 ? s.slice(0, 10) : s;
   };
 
-  // คำนวณ bill & net ทุกครั้งที่ unit/rent/status/payDate เปลี่ยน
+  // คำนวณ bill & net เฉพาะเมื่อแก้ไข unit (ใช้ค่าจาก API เป็นหลัก)
   useEffect(() => {
+    // ถ้ามีข้อมูลจาก API แล้ว ไม่ต้องคำนวณใหม่
+    if (initial.water && initial.electricity) {
+      return; // ใช้ค่าจาก API
+    }
+
+    // คำนวณใหม่เฉพาะเมื่อไม่มีค่าจาก API หรือกำลังแก้ไข
     const waterBill = round(toNumber(invoiceForm.waterUnit) * RATE_WATER_PER_UNIT);
     const elecBill = round(toNumber(invoiceForm.electricityUnit) * RATE_ELEC_PER_UNIT);
     const rent = toNumber(invoiceForm.rent);
 
     const subtotal = round(rent + waterBill + elecBill + SERVICE_FEE);
 
-    const days = diffDays(invoiceForm.createDate, invoiceForm.payDate);
-    const within15 = days !== null && days <= 15;
-
-    let net, penalty;
-    if (within15) {
-      penalty = 0;
-      net = subtotal;
+    // ✅ Penalty Logic: 10% ของค่าเช่าถ้าเกิน penaltyDate และ status = Incomplete
+    const today = new Date();
+    let penaltyDueDate;
+    
+    // ใช้ penalty date ที่ตั้งไว้ หรือ create date + 30 วันเป็น default
+    if (invoiceForm.penaltyDate) {
+      penaltyDueDate = new Date(invoiceForm.penaltyDate);
     } else {
-      net = subtotal === 0 ? 0 : round(subtotal / 0.9);
-      penalty = round(net - subtotal);
+      const createDate = new Date(invoiceForm.createDate);
+      penaltyDueDate = new Date(createDate.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 วัน
     }
+    
+    const isOverdue = today > penaltyDueDate;
+    
+    let penalty = 0;
+    if (isOverdue && (invoiceForm.status === "incomplete" || invoiceForm.status === "pending")) {
+      penalty = Math.round(rent * 0.1); // 10% ของค่าเช่า
+      const overdueDays = Math.ceil((today - penaltyDueDate) / (1000 * 60 * 60 * 24));
+      console.log(`💰 Penalty applied: ${penalty} (10% of rent ${rent}) - Overdue by ${overdueDays} days from penalty date ${penaltyDueDate.toLocaleDateString()}`);
+    }
+    
+    const net = subtotal + penalty;
 
     setInvoiceForm((p) => ({
       ...p,
@@ -130,12 +185,15 @@ function InvoiceDetails() {
       amount: net,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     invoiceForm.waterUnit,
     invoiceForm.electricityUnit,
     invoiceForm.rent,
     invoiceForm.payDate,
     invoiceForm.createDate,
+    invoiceForm.status, // เพื่อคำนวณ penalty ใหม่
+    invoiceForm.penaltyDate, // เพื่อคำนวณ penalty จาก penalty date ที่ตั้งไว้
   ]);
 
   //============= cleanupBackdrops =============//
@@ -328,13 +386,17 @@ function InvoiceDetails() {
                           <p><span className="label">Create date:</span> <span className="value">{invoiceForm.createDate}</span></p>
                           <p><span className="label">Water unit:</span> <span className="value">{invoiceForm.waterUnit}</span></p>
                           <p><span className="label">Electricity unit:</span> <span className="value">{invoiceForm.electricityUnit}</span></p>
-                          <p><span className="label">NET:</span> <span className="value">{invoiceForm.amount.toLocaleString()}</span></p>
                           <p><span className="label">Pay date:</span> <span className="value">{invoiceForm.payDate || "-"}</span></p>
                         </div>
                         <div className="col-6">
                           <p><span className="label">Rent:</span> <span className="value">{invoiceForm.rent.toLocaleString()}</span></p>
                           <p><span className="label">Water bill:</span> <span className="value">{invoiceForm.water.toLocaleString()}</span></p>
                           <p><span className="label">Electricity bill:</span> <span className="value">{invoiceForm.electricity.toLocaleString()}</span></p>
+                          <p><span className="label">NET:</span> <span className="value fw-bold text-primary">{invoiceForm.amount.toLocaleString()}</span></p>
+                        </div>
+                      </div>
+                      <div className="row mt-2">
+                        <div className="col-12">
                           <p>
                             <span className="label">Status:</span>{" "}
                             <span className="value">
@@ -353,7 +415,7 @@ function InvoiceDetails() {
                       <h5 className="card-title">Penalty Information</h5>
                       <div className="row">
                         <div className="col-6">
-                          <p><span className="label">Penalty:</span> <span className="value">{invoiceForm.penalty > 0 ? invoiceForm.penalty.toLocaleString() : "-"}</span></p>
+                          <p><span className="label">Penalty:</span> <span className="value">{invoiceForm.penalty > 0 ? invoiceForm.penalty.toLocaleString() : "0"}</span></p>
                         </div>
                         <div className="col-6">
                           <p><span className="label">Penalty date:</span> <span className="value">{invoiceForm.penaltyDate || "-"}</span></p>
@@ -485,7 +547,7 @@ function InvoiceDetails() {
                   >
                     <option value="complete">Complete</option>
                     <option value="pending">Pending</option>
-                    <option value="overdue">Overdue</option>
+                    {/* <option value="overdue">Overdue</option> */}
                   </select>
                 </div>
 

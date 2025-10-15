@@ -37,10 +37,14 @@ public class MaintainServiceImpl implements MaintainService {
     @Override
     @Transactional
     public MaintainDto create(CreateMaintainRequest req) {
+        System.out.println("🚀 Creating maintain request: " + req);
         validateCreate(req);
 
         Room room = resolveRoom(req.getRoomId(), req.getRoomNumber());
         RoomAsset asset = resolveAsset(req.getRoomAssetId());
+        
+        System.out.println("🏠 Resolved room: " + (room != null ? room.getId() : "null"));
+        System.out.println("🔧 Resolved asset: " + (asset != null ? asset.getId() : "null"));
 
         Maintain m = Maintain.builder()
                 .targetType(req.getTargetType())
@@ -52,9 +56,17 @@ public class MaintainServiceImpl implements MaintainService {
                 .createDate(req.getCreateDate() != null ? req.getCreateDate() : LocalDateTime.now())
                 .scheduledDate(req.getScheduledDate())
                 .finishDate(req.getFinishDate())
+                // ✅ เพิ่มฟิลด์ใหม่
+                .maintainType(req.getMaintainType())
+                .technicianName(req.getTechnicianName())
+                .technicianPhone(req.getTechnicianPhone())
                 .build();
 
-        return toDto(maintainRepository.save(m));
+        System.out.println("💾 Saving maintain entity...");
+        Maintain saved = maintainRepository.save(m);
+        System.out.println("✅ Saved with ID: " + saved.getId());
+        
+        return toDto(saved);
     }
 
     @Override
@@ -80,6 +92,11 @@ public class MaintainServiceImpl implements MaintainService {
         if (req.getIssueDescription() != null)   m.setIssueDescription(req.getIssueDescription());
         if (req.getScheduledDate() != null)      m.setScheduledDate(req.getScheduledDate());
         if (req.getFinishDate() != null)         m.setFinishDate(req.getFinishDate());
+
+        // ✅ อัปเดตฟิลด์ใหม่
+        if (req.getMaintainType() != null)       m.setMaintainType(req.getMaintainType());
+        if (req.getTechnicianName() != null)     m.setTechnicianName(req.getTechnicianName());
+        if (req.getTechnicianPhone() != null)    m.setTechnicianPhone(req.getTechnicianPhone());
 
         return toDto(maintainRepository.save(m));
     }
@@ -133,6 +150,10 @@ public class MaintainServiceImpl implements MaintainService {
                 .createDate(m.getCreateDate())
                 .scheduledDate(m.getScheduledDate())
                 .finishDate(m.getFinishDate())
+                // ✅ เพิ่มฟิลด์ใหม่
+                .maintainType(m.getMaintainType())
+                .technicianName(m.getTechnicianName())
+                .technicianPhone(m.getTechnicianPhone())
                 .build();
     }
 }

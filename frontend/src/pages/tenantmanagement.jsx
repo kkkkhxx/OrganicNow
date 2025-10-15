@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
 import useMessage from "../component/useMessage"; 
+import { useToast } from "../component/Toast.jsx";
 import Pagination from "../component/pagination";
 import { pageSize as defaultPageSize, apiPath } from "../config_variable";
 import "../assets/css/tenantmanagement.css";
@@ -13,6 +14,8 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
 function TenantManagement() {
+  const { showSuccess, showError, showWarning } = useToast();
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -110,7 +113,7 @@ function TenantManagement() {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get(`${apiPath}/rooms`, {
+        const res = await axios.get(`${apiPath}/room/list`, {
           withCredentials: true,
         });
         if (Array.isArray(res.data)) {
@@ -232,8 +235,10 @@ function TenantManagement() {
         document.getElementById("modalForm_btnClose")?.click();
         fetchData(currentPage);
         showMessageSave();
+        showSuccess("🎉 เพิ่มผู้เช่าใหม่สำเร็จแล้ว!");
       } else {
         showMessageError("Unexpected response: " + JSON.stringify(res.data));
+        showError(`❌ เพิ่มผู้เช่าล้มเหลว: HTTP ${res.status}`);
       }
     } catch (e) {
       if (e.response) {
@@ -246,24 +251,29 @@ function TenantManagement() {
             case msg === "duplicate_national_id":
             case msg.includes("duplicate_national_id"):
               showMessageError("NationalID Already Exists");
+              showWarning("⚠️ บัตรประชาชนนี้มีอยู่ในระบบแล้ว");
               return;
 
             default:
               showMessageError(msg || "Conflict error");
+              showError(`❌ เพิ่มผู้เช่าล้มเหลว: ${msg || "ข้อมูลซ้ำ"}`);
               return;
           }
         }
 
         if (e.response.status === 401) {
           showMessagePermission?.();
+          showWarning("⚠️ ไม่มีสิทธิ์ในการเพิ่มผู้เช่า");
           return;
         }
 
         showMessageError(
           e.response.data?.message || `Server error (${e.response.status})`
         );
+        showError(`❌ เพิ่มผู้เช่าล้มเหลว: ${e.response.data?.message || "เกิดข้อผิดพลาด"}`);
       } else {
         showMessageError(e.message || "Unexpected error");
+        showError(`❌ เพิ่มผู้เช่าล้มเหลว: ${e.message || "ไม่ทราบสาเหตุ"}`);
       }
     }
   };
@@ -337,15 +347,19 @@ function TenantManagement() {
 
       if (res.status === 204) {
         showMessageSave("ลบข้อมูลสำเร็จ");
+        showSuccess("🗑️ ลบผู้เช่าสำเร็จแล้ว!");
         fetchData(currentPage);
       } else {
         showMessageError("Unexpected response: " + res.status);
+        showError(`❌ ลบผู้เช่าล้มเหลว: HTTP ${res.status}`);
       }
     } catch (e) {
       if (e.response && e.response.status === 401) {
         showMessagePermission?.();
+        showWarning("⚠️ ไม่มีสิทธิ์ในการลบข้อมูล");
       } else {
         showMessageError(e);
+        showError(`❌ ลบผู้เช่าล้มเหลว: ${e.message}`);
       }
     }
   };

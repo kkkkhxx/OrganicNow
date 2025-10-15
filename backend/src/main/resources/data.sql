@@ -124,8 +124,10 @@ INSERT INTO maintain (target_type, room_id, issue_category, issue_title, issue_d
 -- ========================
 -- Maintenance Schedule
 -- ========================
-INSERT INTO maintenance_schedule (schedule_scope, room_id, cycle_month, last_done_date, next_due_date, notify_before_date, schedule_title, schedule_description) VALUES
-                                                                                                                                                                     (0, 1, 6, '2025-01-01', '2025-07-01', 7, 'ตรวจแอร์', 'ตรวจเช็คและทำความสะอาดแอร์'),
-                                                                                                                                                                     (1, 2, 12, '2025-01-10', '2026-01-10', 14, 'ตรวจสภาพห้อง', 'ตรวจสอบรอยร้าว พื้น เพดาน'),
-                                                                                                                                                                     (0, 3, 3, '2025-02-01', '2025-05-01', 3, 'ตรวจหลอดไฟ', 'ตรวจสอบและเปลี่ยนหลอดไฟ')
+INSERT INTO maintenance_schedule
+(schedule_scope, asset_group_id, cycle_month, last_done_date, next_due_date, notify_before_date, schedule_title, schedule_description)
+VALUES
+    (0, 1, 6, '2025-01-01', '2025-07-01', 7, 'ตรวจแอร์', 'ตรวจเช็คและทำความสะอาดแอร์'),
+    (1, 2, 12, '2025-01-10', '2026-01-10', 14, 'ตรวจสภาพห้อง', 'ตรวจสอบรอยร้าว พื้น เพดาน'),
+    (0, 3, 3, '2025-02-01', '2025-05-01', 3, 'ตรวจหลอดไฟ', 'ตรวจสอบและเปลี่ยนหลอดไฟ')
     ON CONFLICT DO NOTHING;

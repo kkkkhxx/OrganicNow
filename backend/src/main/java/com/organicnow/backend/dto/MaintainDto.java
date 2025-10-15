@@ -19,6 +19,11 @@ public class MaintainDto {
     private LocalDateTime scheduledDate;
     private LocalDateTime finishDate;
 
+    // ✅ เพิ่มฟิลด์ใหม่
+    private String maintainType;        // ประเภทการซ่อม
+    private String technicianName;      // ชื่อช่าง
+    private String technicianPhone;     // เบอร์โทรช่าง
+
     // ช่วยแปลงสถานะไว้ใช้บน UI
     public String getState() {
         return finishDate != null ? "Complete" : "Not Started";

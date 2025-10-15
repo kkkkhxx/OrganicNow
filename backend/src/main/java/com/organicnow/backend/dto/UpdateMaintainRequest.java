@@ -19,4 +19,9 @@ public class UpdateMaintainRequest {
 
     private LocalDateTime scheduledDate; // nullable
     private LocalDateTime finishDate;    // nullable
+
+    // ✅ เพิ่มฟิลด์ใหม่
+    private String maintainType;         // nullable - ประเภทการซ่อม
+    private String technicianName;       // nullable - ชื่อช่าง
+    private String technicianPhone;      // nullable - เบอร์โทรช่าง
 }
