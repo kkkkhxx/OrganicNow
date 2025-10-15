@@ -24,20 +24,45 @@ public class RoomService {
     private final MaintainRepository maintainRepository;
     private final RoomAssetRepository roomAssetRepository;
 
-    // ✅ ดึงข้อมูลห้องทั้งหมด (พร้อม requests)
+    // ✅ ดึงข้อมูลห้องทั้งหมด (พร้อม requests) และ assets แบบยิง DB ครั้งเดียว (ไม่ N+1)
     public List<RoomDetailDto> getAllRooms() {
         List<RoomDetailDto> rooms = roomRepository.findAllRooms();
+        if (rooms.isEmpty()) return rooms;
 
-        // 🔹 เพิ่ม request ของแต่ละห้อง
+        // roomIds สำหรับดึง assets ครั้งเดียว
+        List<Long> roomIds = rooms.stream()
+                .map(RoomDetailDto::getRoomId)
+                .collect(Collectors.toList());
+
+        // ✅ ดึง assets ของทุกห้องในครั้งเดียว
+        List<Object[]> rows = roomAssetRepository.findAssetsByRoomIds(roomIds);
+
+        // map: roomId -> List<AssetDto>
+        Map<Long, List<AssetDto>> assetsByRoom = new HashMap<>();
+        for (Object[] row : rows) {
+            Long roomId       = (Long)    row[0];
+            Long assetId      = (Long)    row[1];
+            String assetName  = (String)  row[2];
+            String groupName  = (String)  row[3];
+            Integer roomFloor = (Integer) row[4];
+            String roomNumber = (String)  row[5];
+
+            AssetDto dto = new AssetDto(assetId, assetName, groupName, roomFloor, roomNumber);
+            assetsByRoom.computeIfAbsent(roomId, k -> new ArrayList<>()).add(dto);
+        }
+
+        // เติม requests (คงเดิม) + assets (จาก map ที่รวมมาแล้ว)
         for (RoomDetailDto room : rooms) {
             List<RequestDto> reqs = maintainRepository.findRequestsByRoomId(room.getRoomId());
             room.setRequests(reqs);
+
+            room.setAssets(assetsByRoom.getOrDefault(room.getRoomId(), Collections.emptyList()));
         }
 
         return rooms;
     }
 
-    // ✅ ดึงข้อมูลห้องแบบละเอียด
+    // ✅ ดึงข้อมูลห้องแบบละเอียด (เดิม) — ใช้ได้เลย
     public RoomDetailDto getRoomDetail(Long roomId) {
         RoomDetailDto dto = roomRepository.findRoomDetail(roomId);
         if (dto == null) return null;
