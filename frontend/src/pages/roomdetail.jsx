@@ -6,7 +6,7 @@ import "../assets/css/roomdetail.css";
 import useMessage from "../component/useMessage";
 
 function RoomDetail() {
-  const { id } = useParams();
+  const { roomId } = useParams();
   const navigate = useNavigate();
   const [roomData, setRoomData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,11 +63,26 @@ function RoomDetail() {
     const fetchRoomDetail = async () => {
       try {
         const [roomRes, assetRes] = await Promise.all([
-          axios.get(`http://localhost:8080/room/${id}/detail`, { withCredentials: true }),
+          axios.get(`http://localhost:8080/room/${roomId}/detail`, { withCredentials: true }),
           axios.get("http://localhost:8080/assets/all", { withCredentials: true }),
         ]);
 
         const roomData = roomRes.data;
+        
+        // Debug: ดูข้อมูลที่ backend ส่งมา  
+        console.log("Complete room data:", roomData);
+        console.log("Tenant info:", {
+          firstName: roomData.firstName,
+          lastName: roomData.lastName,
+          email: roomData.email,
+          phoneNumber: roomData.phoneNumber,
+          contractTypeName: roomData.contractTypeName,
+          signDate: roomData.signDate,
+          startDate: roomData.startDate,
+          endDate: roomData.endDate,
+          status: roomData.status
+        });
+        
         const roomAssets = Array.isArray(roomData.assets) ? roomData.assets : [];
         const allAssets = Array.isArray(assetRes.data.result)
           ? assetRes.data.result
@@ -90,7 +105,7 @@ function RoomDetail() {
     };
 
     fetchRoomDetail();
-  }, [id]);
+  }, [roomId]);
 
   if (loading) return <p className="text-center mt-5">Loading...</p>;
   if (error) return <p className="text-center mt-5">{error}</p>;
@@ -175,42 +190,49 @@ function RoomDetail() {
 
                     <hr />
                     <h5 className="card-title">Current Tenant</h5>
-                    <p>
-                      <strong>First Name:</strong> {roomData.firstName}
-                    </p>
-                    <p>
-                      <strong>Last Name:</strong> {roomData.lastName}
-                    </p>
-                    <p>
-                      <strong>Phone Number:</strong> {roomData.phoneNumber}
-                    </p>
-                    <p>
-                      <strong>Email:</strong> {roomData.email}
-                    </p>
-                    <p>
-                      <strong>Package:</strong>
-                      <span className="value">
-                        <span
-                          className={`package-badge badge ${getPackageBadgeClass(
-                            roomData.contractName || roomData.contractTypeName || "-"
-                          )}`}
-                        >
-                          {roomData.contractName || roomData.contractTypeName || "-"}
-                        </span>
-                      </span>
-                    </p>
-                    <p>
-                      <strong>Sign Date:</strong>{" "}
-                      {roomData.signDate?.split("T")[0]}
-                    </p>
-                    <p>
-                      <strong>Start Date:</strong>{" "}
-                      {roomData.startDate?.split("T")[0]}
-                    </p>
-                    <p>
-                      <strong>End Date:</strong>{" "}
-                      {roomData.endDate?.split("T")[0]}
-                    </p>
+                    {roomData.firstName || roomData.lastName || roomData.phoneNumber || roomData.email ? (
+                      <>
+                        <p>
+                          <strong>First Name:</strong> {roomData.firstName || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Last Name:</strong> {roomData.lastName || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Phone Number:</strong> {roomData.phoneNumber || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Email:</strong> {roomData.email || "N/A"}
+                        </p>
+                        <p>
+                          <strong>Package:</strong>
+                          <span className="value">
+                            <span
+                              className={`package-badge badge ${getPackageBadgeClass(
+                                roomData.contractTypeName || "-"
+                              )}`}
+                            >
+                              {roomData.contractTypeName || "No Package"}
+                            </span>
+                          </span>
+                        </p>
+                        <p>
+                          <strong>Sign Date:</strong> {roomData.signDate ? new Date(roomData.signDate).toLocaleDateString() : "N/A"}
+                        </p>
+                        <p>
+                          <strong>Start Date:</strong> {roomData.startDate ? new Date(roomData.startDate).toLocaleDateString() : "N/A"}
+                        </p>
+                        <p>
+                          <strong>End Date:</strong> {roomData.endDate ? new Date(roomData.endDate).toLocaleDateString() : "N/A"}
+                        </p>
+                      </>
+                    ) : (
+                      <div className="text-center text-muted py-3">
+                        <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
+                        <p className="mt-2 mb-0">No current tenant</p>
+                        <small>This room is available for rent</small>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -344,14 +366,14 @@ function RoomDetail() {
 
                   // 🟢 2. ส่ง request อัปเดต asset ในห้อง
                   await axios.put(
-                    `http://localhost:8080/room/${id}/assets`,
+                    `http://localhost:8080/room/${roomId}/assets`,
                     selectedIds,
                     { withCredentials: true }
                   );
 
                   // 🟢 3. อัปเดตข้อมูลพื้นฐานของห้อง
                   await axios.put(
-                    `http://localhost:8080/room/${id}`,
+                    `http://localhost:8080/room/${roomId}`,
                     {
                       roomFloor: form.roomFloor,
                       roomNumber: form.roomNumber,
@@ -362,7 +384,7 @@ function RoomDetail() {
 
                   // 🟢 4. โหลดข้อมูลใหม่ (refresh)
                   const refreshed = await axios.get(
-                    `http://localhost:8080/room/${id}/detail`,
+                    `http://localhost:8080/room/${roomId}/detail`,
                     { withCredentials: true }
                   );
                   setRoomData(refreshed.data);

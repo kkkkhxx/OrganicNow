@@ -33,4 +33,26 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
         ORDER BY month
     """, nativeQuery = true)
     List<Object[]> countFinanceLast12Months();
+
+    /**
+     * ✅ ดึงข้อมูล Invoice พร้อม Tenant ที่ถูกต้อง (ตาม room และ contract)
+     */
+    @Query(value = """
+        SELECT 
+            i.invoice_id, i.create_date, i.due_date, i.invoice_status, 
+            i.pay_date, i.pay_method, i.sub_total, i.penalty_total, i.net_amount,
+            t.first_name, t.last_name, t.national_id, t.phone_number, t.email,
+            r.room_floor, r.room_number,
+            ct.contract_name, pp.price,
+            c.sign_date, c.start_date, c.end_date
+        FROM invoice i
+        INNER JOIN contract c ON i.contract_id = c.contract_id
+        INNER JOIN room r ON c.room_id = r.room_id
+        INNER JOIN tenant t ON c.tenant_id = t.tenant_id
+        INNER JOIN package_plan pp ON c.package_id = pp.package_id
+        INNER JOIN contract_type ct ON pp.contract_type_id = ct.contract_type_id
+        WHERE c.status = 1
+        ORDER BY i.invoice_id DESC
+    """, nativeQuery = true)
+    List<Object[]> findAllInvoicesWithTenantDetails();
 }

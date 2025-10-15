@@ -34,7 +34,7 @@ function InvoiceManagement() {
   const [tenants, setTenants] = useState([]);
   const [packages, setPackages] = useState([]);
 
-  // สำหรับ dropdown ห้อง (ใช้ข้อมูลจาก backend เท่านั้น)
+  // สำหรับ dropdown ห้อง (ใช้เฉพาะห้องที่มีผู้เช่าอยู่จริง)
   const roomsByFloor = useMemo(() => {
     if (!rooms || rooms.length === 0) {
       return {};
@@ -46,8 +46,12 @@ function InvoiceManagement() {
       // ใช้ field names ที่ถูกต้องจาก API response จริง
       const floor = room.roomFloor;  // field จริงจาก API
       const roomNumber = room.roomNumber;  // field จริงจาก API
+      const status = room.status;  // สถานะห้อง
       
-      if (floor !== undefined && floor !== null && roomNumber !== undefined && roomNumber !== null) {
+      // ✅ เพิ่มเงื่อนไข: แสดงเฉพาะห้องที่มีผู้เช่าอยู่ (status = 'occupied')
+      if (floor !== undefined && floor !== null && 
+          roomNumber !== undefined && roomNumber !== null && 
+          status === 'occupied') {
         const floorStr = String(floor);
         const roomStr = String(roomNumber);
         if (!result[floorStr]) result[floorStr] = [];
@@ -112,6 +116,26 @@ function InvoiceManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ Refresh ข้อมูลเมื่อ page กลับมา visible (เช่น จาก tenant management)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // หน้าจอ visible แล้ว - refresh ข้อมูล
+        fetchRooms();
+        fetchContracts();
+        fetchTenants();
+        fetchData(); // รวมถึง invoice list ด้วย
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -138,7 +162,7 @@ function InvoiceManagement() {
   // ✅ ดึงข้อมูลห้องจาก backend
   const fetchRooms = async () => {
     try {
-      const res = await fetch(`${API_BASE}/room/list`, {
+      const res = await fetch(`${API_BASE}/room`, {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
@@ -163,7 +187,7 @@ function InvoiceManagement() {
   // ✅ ดึงข้อมูล contract จาก backend
   const fetchContracts = async () => {
     try {
-      const res = await fetch(`${API_BASE}/contract/list`, {
+      const res = await fetch(`${API_BASE}/contracts`, {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
@@ -268,23 +292,39 @@ function InvoiceManagement() {
     return roomsByFloor[invForm.floor];
   }, [invForm.floor, roomsByFloor]);
 
-  // Auto-select package when floor and room are selected (เฉพาะ active packages)
+  // Auto-select package when floor and room are selected (เฉพาะห้องที่มีผู้เช่าและ active packages)
   useEffect(() => {
     if (invForm.floor && invForm.room) {
-      // First try to find from contracts (ใช้ field names ที่ถูกต้อง)
-      const contractData = contracts.find(contract => {
-        const floorMatch = contract.floor === Number(invForm.floor);
-        const roomMatch = contract.room === invForm.room;
+      // ✅ ตรวจสอบว่าห้องที่เลือกมีผู้เช่าอยู่จริง
+      const selectedRoom = rooms.find(room => {
+        const floorMatch = room.roomFloor === Number(invForm.floor);
+        const roomMatch = room.roomNumber === invForm.room;
         return floorMatch && roomMatch;
       });
       
-      if (contractData && contractData.packageId) {
+      // ถ้าห้องไม่มีผู้เช่า (status !== 'occupied') ให้รีเซ็ต form
+      if (!selectedRoom || selectedRoom.status !== 'occupied') {
+        setInvForm((prev) => ({ 
+          ...prev, 
+          packageId: ""
+        }));
+        return;
+      }
+      
+      // ✅ ใช้ข้อมูลจาก tenants array ที่มี contract data ครบ
+      const tenantData = tenants.find(tenant => {
+        const floorMatch = tenant.floor === Number(invForm.floor);
+        const roomMatch = tenant.room === invForm.room;
+        return floorMatch && roomMatch;
+      });
+      
+      if (tenantData && tenantData.packageId) {
         // ✅ ตรวจสอบว่า package ยัง active อยู่หรือไม่
-        const packageData = packages.find(pkg => pkg.id === contractData.packageId);
+        const packageData = packages.find(pkg => pkg.id === tenantData.packageId);
         if (packageData && (packageData.is_active === 1 || packageData.is_active === true)) {
           setInvForm((prev) => ({ 
             ...prev, 
-            packageId: contractData.packageId.toString()
+            packageId: tenantData.packageId.toString()
           }));
           return;
         }
@@ -319,7 +359,7 @@ function InvoiceManagement() {
         packageId: ""
       }));
     }
-  }, [invForm.floor, invForm.room, rooms, contracts, packages]);
+  }, [invForm.floor, invForm.room, rooms, tenants, packages]);
 
   // ถ้าเปลี่ยนชั้นแล้วห้องเดิมไม่อยู่ในตัวเลือก ให้รีเซ็ตห้อง
   useEffect(() => {
@@ -621,20 +661,36 @@ function InvoiceManagement() {
                   <div className="d-flex align-items-center gap-2">
                     <button
                       type="button"
+                      className="btn btn-outline-primary btn-sm"
+                      onClick={() => {
+                        fetchRooms();
+                        fetchContracts();
+                        fetchTenants();
+                        fetchData();
+                      }}
+                      title="รีเฟรชข้อมูล"
+                    >
+                      <i className="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
+                    
+                    <button
+                      type="button"
                       className="btn btn-primary"
                       data-bs-toggle="modal"
                       data-bs-target="#createInvoiceModal"
+                      disabled={Object.keys(roomsByFloor).length === 0}
                       onClick={() => {
                         // ✅ Refresh packages data เมื่อเปิด modal
                         fetchPackages();
                       }}
+                      title={Object.keys(roomsByFloor).length === 0 ? "No occupied rooms available for invoice creation" : "Create new invoice"}
                     >
                       <i className="bi bi-plus-lg me-1"></i> Create Invoice
                     </button>
-                    <button className="btn btn-outline-secondary" onClick={fetchData} disabled={loading}>
+                    {/* <button className="btn btn-outline-secondary" onClick={fetchData} disabled={loading}>
                       <i className={`bi ${loading ? "bi-arrow-repeat spin" : "bi-arrow-repeat"} me-1`}></i>
                       Refresh
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               </div>
@@ -644,6 +700,15 @@ function InvoiceManagement() {
             {err && (
               <div className="alert alert-danger mt-3" role="alert">
                 {err}
+              </div>
+            )}
+
+            {/* Warning when no occupied rooms */}
+            {Object.keys(roomsByFloor).length === 0 && !loading && (
+              <div className="alert alert-warning mt-3" role="alert">
+                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>No occupied rooms available:</strong> Invoices can only be created for rooms with active tenants. 
+                Please ensure there are tenants with active contracts before creating invoices.
               </div>
             )}
 
@@ -822,11 +887,17 @@ function InvoiceManagement() {
                       <option value="" hidden>
                         Select Floor
                       </option>
-                      {Object.keys(roomsByFloor).sort().map((floor) => (
-                        <option key={floor} value={floor} style={{ backgroundColor: '#fff', color: '#000' }}>
-                          Floor {floor}
+                      {Object.keys(roomsByFloor).length === 0 ? (
+                        <option value="" disabled style={{ backgroundColor: '#fff', color: '#dc3545' }}>
+                          No occupied rooms available - Only occupied rooms can receive invoices
                         </option>
-                      ))}
+                      ) : (
+                        Object.keys(roomsByFloor).sort().map((floor) => (
+                          <option key={floor} value={floor} style={{ backgroundColor: '#fff', color: '#000' }}>
+                            Floor {floor}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                 </div>
@@ -845,11 +916,21 @@ function InvoiceManagement() {
                       <option value="" hidden>
                         {invForm.floor ? "Select Room" : "Select Floor first"}
                       </option>
-                      {roomOptions.map((rm) => (
-                        <option key={rm} value={rm} style={{ backgroundColor: '#fff', color: '#000' }}>
-                          Room {rm}
+                      {!invForm.floor ? (
+                        <option value="" disabled style={{ backgroundColor: '#fff', color: '#6c757d' }}>
+                          Please select floor first
                         </option>
-                      ))}
+                      ) : roomOptions.length === 0 ? (
+                        <option value="" disabled style={{ backgroundColor: '#fff', color: '#dc3545' }}>
+                          No occupied rooms available on this floor
+                        </option>
+                      ) : (
+                        roomOptions.map((rm) => (
+                          <option key={rm} value={rm} style={{ backgroundColor: '#fff', color: '#000' }}>
+                            Room {rm}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                 </div>

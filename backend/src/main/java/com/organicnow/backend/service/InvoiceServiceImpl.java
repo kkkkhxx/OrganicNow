@@ -7,6 +7,7 @@ import com.organicnow.backend.model.Contract;
 import com.organicnow.backend.model.Invoice;
 import com.organicnow.backend.repository.ContractRepository;
 import com.organicnow.backend.repository.InvoiceRepository;
+import com.organicnow.backend.repository.RoomRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,11 +21,14 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final ContractRepository contractRepository;
+    private final RoomRepository roomRepository;
 
     public InvoiceServiceImpl(InvoiceRepository invoiceRepository,
-                              ContractRepository contractRepository) {
+                              ContractRepository contractRepository,
+                              RoomRepository roomRepository) {
         this.invoiceRepository = invoiceRepository;
         this.contractRepository = contractRepository;
+        this.roomRepository = roomRepository;
     }
 
     // ===== CRUD =====
@@ -33,6 +37,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         // อัปเดต penalty อัตโนมัติก่อนส่งข้อมูล
         updateOverduePenalties();
         
+        // ✅ ใช้วิธีเดิม (รีเวิร์ท)
         List<Invoice> invoices = invoiceRepository.findAll();
         return invoices.stream().map(this::convertToDto).toList();
     }
@@ -270,6 +275,46 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     // แปลง Invoice -> InvoiceDto
     private InvoiceDto convertToDto(Invoice invoice) {
+        // ✅ ดึงข้อมูล tenant ล่าสุดจาก room assignment แทนการใช้ contract เก่า
+        Contract currentContract = null;
+        String currentFirstName = "N/A";
+        String currentLastName = "";
+        String currentNationalId = "";
+        String currentPhoneNumber = "";
+        String currentEmail = "";
+        String currentPackageName = "N/A";
+        
+        // หาข้อมูล tenant ปัจจุบันจาก room
+        if (invoice.getRequestedFloor() != null && invoice.getRequestedRoom() != null) {
+            currentContract = roomRepository.findCurrentContractByRoomFloorAndNumber(
+                invoice.getRequestedFloor(), 
+                invoice.getRequestedRoom()
+            );
+        }
+        
+        // ถ้าไม่เจอจาก requested room ให้ลองจาก contract เดิม
+        if (currentContract == null && invoice.getContact() != null && invoice.getContact().getRoom() != null) {
+            currentContract = roomRepository.findCurrentContractByRoomFloorAndNumber(
+                invoice.getContact().getRoom().getRoomFloor(),
+                invoice.getContact().getRoom().getRoomNumber()
+            );
+        }
+        
+        // ใช้ current contract ถ้าเจอ, ไม่งั้นใช้ contract เดิม
+        Contract dataSource = currentContract != null ? currentContract : invoice.getContact();
+        
+        if (dataSource != null && dataSource.getTenant() != null) {
+            currentFirstName = dataSource.getTenant().getFirstName();
+            currentLastName = dataSource.getTenant().getLastName();
+            currentNationalId = dataSource.getTenant().getNationalId();
+            currentPhoneNumber = dataSource.getTenant().getPhoneNumber();
+            currentEmail = dataSource.getTenant().getEmail();
+            
+            if (dataSource.getPackagePlan() != null && dataSource.getPackagePlan().getContractType() != null) {
+                currentPackageName = dataSource.getPackagePlan().getContractType().getName();
+            }
+        }
+
         return InvoiceDto.builder()
                 .id(invoice.getId())
                 .contractId(invoice.getContact() != null ? invoice.getContact().getId() : null)
@@ -282,25 +327,14 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .penaltyTotal(invoice.getPenaltyTotal())
                 .netAmount(invoice.getNetAmount())
                 .penaltyAppliedAt(invoice.getPenaltyAppliedAt())
-                // Tenant info
-                .firstName(invoice.getContact() != null && invoice.getContact().getTenant() != null
-                        ? invoice.getContact().getTenant().getFirstName() : "N/A")
-                .lastName(invoice.getContact() != null && invoice.getContact().getTenant() != null
-                        ? invoice.getContact().getTenant().getLastName() : "")
-                .nationalId(invoice.getContact() != null && invoice.getContact().getTenant() != null
-                        ? invoice.getContact().getTenant().getNationalId() : "")
-                .phoneNumber(invoice.getContact() != null && invoice.getContact().getTenant() != null
-                        ? invoice.getContact().getTenant().getPhoneNumber() : "")
-                .email(invoice.getContact() != null && invoice.getContact().getTenant() != null
-                        ? invoice.getContact().getTenant().getEmail() : "")
-                // Package info
-                .packageName(
-                        invoice.getContact() != null
-                                && invoice.getContact().getPackagePlan() != null
-                                && invoice.getContact().getPackagePlan().getContractType() != null
-                                ? invoice.getContact().getPackagePlan().getContractType().getName()
-                                : "N/A")
-                // Contract dates
+                // ✅ ใช้ข้อมูล tenant ปัจจุบัน
+                .firstName(currentFirstName)
+                .lastName(currentLastName)
+                .nationalId(currentNationalId)
+                .phoneNumber(currentPhoneNumber)
+                .email(currentEmail)
+                .packageName(currentPackageName)
+                // Contract dates (ใช้ข้อมูลจาก invoice contract เดิม)
                 .signDate(invoice.getContact() != null ? invoice.getContact().getSignDate() : null)
                 .startDate(invoice.getContact() != null ? invoice.getContact().getStartDate() : null)
                 .endDate(invoice.getContact() != null ? invoice.getContact().getEndDate() : null)

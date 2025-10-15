@@ -151,7 +151,7 @@ function MaintenanceDetails() {
   const [form, setForm] = useState({
     target: "asset", // "asset" or "building"
     issueTitle: "",
-    issueCategory: "",
+    issueCategory: 0,
     issueDescription: "",
     requestDate: "",
     maintainDate: "",
@@ -159,15 +159,16 @@ function MaintenanceDetails() {
     maintainType: "", // ✅ เพิ่มฟิลด์ maintain type
     technician: "",   // ✅ เพิ่มฟิลด์ช่าง
     phone: "",        // ✅ เพิ่มฟิลด์เบอร์โทรช่าง
+    state: "Not Started", // ✅ เพิ่ม state field
   });
 
   // ✅ Issue options for Asset target
   const assetIssueOptions = [
-    { value: "air", label: "แอร์" },
-    { value: "light", label: "ไฟ" },
-    { value: "plumbing", label: "ประปา" },
-    { value: "electrical", label: "ไฟฟ้า" },
-    { value: "other", label: "อื่นๆ" }
+    { value: 0, label: "แอร์" },
+    { value: 1, label: "ไฟ" },
+    { value: 2, label: "ประปา" },
+    { value: 3, label: "ไฟฟ้า" },
+    { value: 4, label: "อื่นๆ" }
   ];
 
   // ✅ Maintain type options
@@ -183,7 +184,7 @@ function MaintenanceDetails() {
     setForm({
       target: data.targetType === 0 ? "asset" : "building",
       issueTitle: data.issueTitle ?? "",
-      issueCategory: data.issueCategory ?? "",
+      issueCategory: data.issueCategory ?? 0,
       issueDescription: data.issueDescription ?? "",
       requestDate: toDate(data.createDate) || "",
       maintainDate: toDate(data.scheduledDate) || "",
@@ -191,18 +192,41 @@ function MaintenanceDetails() {
       maintainType: data.maintainType || "", // ✅ ดึงจาก backend
       technician: data.technicianName || "",   // ✅ ดึงจาก backend  
       phone: data.technicianPhone || "",        // ✅ ดึงจาก backend
+      state: data.finishDate ? "Complete" : (data.scheduledDate ? "In Progress" : "Not Started"), // ✅ กำหนด state ตาม data
     });
   }, [data]);
 
   const onChange = (e) => {
     const { name, value } = e.target;
     setForm((s) => {
-      const newForm = { ...s, [name]: value };
+      // ✅ Convert issueCategory to Integer
+      const processedValue = name === "issueCategory" ? parseInt(value, 10) || 0 : value;
+      const newForm = { ...s, [name]: processedValue };
       
       // ✅ Reset issue fields when target changes
       if (name === "target") {
         newForm.issueTitle = "";
-        newForm.issueCategory = "";
+        newForm.issueCategory = 0;
+      }
+      
+      // ✅ Auto-set completeDate when state changes to Complete
+      if (name === "state") {
+        if (value === "Complete") {
+          // ถ้ายังไม่มี completeDate ให้ใส่วันนี้
+          if (!newForm.completeDate) {
+            newForm.completeDate = new Date().toISOString().slice(0, 10);
+          }
+        } else if (value === "Not Started") {
+          // ถ้าเป็น Not Started ให้ลบ completeDate และ maintainDate
+          newForm.completeDate = "";
+          newForm.maintainDate = "";
+        } else if (value === "In Progress") {
+          // ถ้าเป็น In Progress ให้ลบ completeDate แต่เก็บ maintainDate
+          newForm.completeDate = "";
+          if (!newForm.maintainDate) {
+            newForm.maintainDate = new Date().toISOString().slice(0, 10);
+          }
+        }
       }
       
       return newForm;
@@ -211,21 +235,25 @@ function MaintenanceDetails() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    
+    // ✅ ป้องกัน double submit
+    if (saving) return;
+    
     try {
       setSaving(true);
 
-      // ✅ Check for status changes to show appropriate messages
+      // ✅ Check for status changes to show appropriate messages (ใช้ form.state เป็นหลัก)
       const previousStatus = data?.finishDate ? "Complete" : (data?.scheduledDate ? "In Progress" : "Not Started");
-      const newStatus = form.completeDate ? "Complete" : (form.maintainDate ? "In Progress" : "Not Started");
+      const newStatus = form.state; // ✅ ใช้ state จาก form โดยตรง
       const statusChanged = previousStatus !== newStatus;
 
       const payload = {
         targetType: form.target === "asset" ? 0 : 1,
         issueTitle: form.issueTitle,
-        issueCategory: form.target === "asset" ? form.issueCategory : form.issueTitle,
+        issueCategory: form.target === "asset" ? form.issueCategory : 0, // ✅ Building ใช้ 0, Asset ใช้จาก dropdown
         issueDescription: form.issueDescription,
-        scheduledDate: toLdt(form.maintainDate),
-        finishDate: form.completeDate ? toLdt(form.completeDate) : null,
+        scheduledDate: form.state !== "Not Started" && form.maintainDate ? toLdt(form.maintainDate) : null, // ✅ ส่ง scheduledDate ตาม state
+        finishDate: form.state === "Complete" && form.completeDate ? toLdt(form.completeDate) : null, // ✅ ส่ง finishDate ตาม state
         // ✅ เพิ่มฟิลด์ใหม่
         maintainType: form.maintainType,
         technicianName: form.technician,
@@ -257,10 +285,43 @@ function MaintenanceDetails() {
         showSuccess(`✅ Maintenance Request #${maintainId} updated successfully!`);
       }
 
-      // ปิด modal
-      const el = document.getElementById("editMaintainModal");
-      if (el) bootstrap.Modal.getInstance(el)?.hide();
+      // ✅ ปิด modal อย่างสมบูรณ์
+      const modalElement = document.getElementById("editMaintainModal");
+      if (modalElement) {
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+          modalInstance.hide();
+        }
+        
+        // ✅ Force ลบ modal backdrop และ class
+        setTimeout(() => {
+          // ลบ backdrop
+          const backdrop = document.querySelector('.modal-backdrop');
+          if (backdrop) {
+            backdrop.remove();
+          }
+          
+          // ลบ class จาก body
+          document.body.classList.remove('modal-open');
+          document.body.style.overflow = '';
+          document.body.style.paddingRight = '';
+          
+          // รีเซ็ต modal
+          modalElement.classList.remove('show');
+          modalElement.style.display = 'none';
+          modalElement.setAttribute('aria-hidden', 'true');
+          modalElement.removeAttribute('aria-modal');
+          modalElement.removeAttribute('role');
+        }, 150);
+      }
+      
+      // ✅ รีโหลดข้อมูลหลังอัปเดตเสร็จ
+      setTimeout(() => {
+        fetchOne();
+      }, 200);
+      
     } catch (e2) {
+      console.error("❌ Update error:", e2);
       showError(`❌ Update failed: ${e2.message}`);
     } finally {
       setSaving(false);
@@ -404,6 +465,24 @@ function MaintenanceDetails() {
                       data-bs-toggle="modal"
                       data-bs-target="#editMaintainModal"
                       disabled={!data}
+                      onClick={() => {
+                        // ✅ รีเซ็ต form เมื่อเปิด modal
+                        if (data) {
+                          setForm({
+                            target: data.targetType === 0 ? "asset" : "building",
+                            issueTitle: data.issueTitle ?? "",
+                            issueCategory: data.issueCategory ?? 0,
+                            issueDescription: data.issueDescription ?? "",
+                            requestDate: toDate(data.createDate) || "",
+                            maintainDate: toDate(data.scheduledDate) || "",
+                            completeDate: toDate(data.finishDate) || "",
+                            maintainType: data.maintainType ?? "fix",
+                            technician: data.technicianName ?? "",
+                            phone: data.technicianPhone ?? "",
+                            state: data.finishDate ? "Complete" : (data.scheduledDate ? "In Progress" : "Not Started"), // ✅ กำหนด state
+                          });
+                        }
+                      }}
                     >
                       <i className="bi bi-pencil me-1"></i> Edit Request
                     </button>
@@ -659,7 +738,7 @@ function MaintenanceDetails() {
                         onChange={onChange}
                         required
                       >
-                        <option value="">เลือกประเภทปัญหา</option>
+                        <option value={0}>เลือกประเภทปัญหา</option>
                         {assetIssueOptions.map(option => (
                           <option key={option.value} value={option.value}>
                             {option.label}
@@ -779,11 +858,27 @@ function MaintenanceDetails() {
 
             {/* Footer */}
             <div className="d-flex justify-content-center gap-3 pt-4 pb-2">
-              <button type="button" className="btn btn-outline-secondary" data-bs-dismiss="modal">
+              <button 
+                type="button" 
+                className="btn btn-outline-secondary" 
+                data-bs-dismiss="modal"
+                disabled={saving}
+              >
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? "Saving..." : "Save"}
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
               </button>
             </div>
           </form>

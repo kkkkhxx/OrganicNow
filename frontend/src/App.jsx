@@ -90,13 +90,13 @@ function App() {
                 } />
                 
                 {/* ✅ Detail Pages - All protected */}
-                <Route path="/tenantdetail" element={
+                <Route path="/tenantdetail/:contractId" element={
                   <ProtectedRoute>
                     <TenantDetail />
                   </ProtectedRoute>
                 } />
                 
-                <Route path="/roomdetail" element={
+                <Route path="/roomdetail/:roomId" element={
                   <ProtectedRoute>
                     <RoomDetail />
                   </ProtectedRoute>

@@ -90,8 +90,12 @@ public class MaintainServiceImpl implements MaintainService {
         if (req.getIssueCategory() != null)      m.setIssueCategory(req.getIssueCategory());
         if (req.getIssueTitle() != null)         m.setIssueTitle(req.getIssueTitle());
         if (req.getIssueDescription() != null)   m.setIssueDescription(req.getIssueDescription());
-        if (req.getScheduledDate() != null)      m.setScheduledDate(req.getScheduledDate());
-        if (req.getFinishDate() != null)         m.setFinishDate(req.getFinishDate());
+        
+        // ✅ อัปเดต scheduledDate (รับค่า null ได้)
+        m.setScheduledDate(req.getScheduledDate());
+        
+        // ✅ อัปเดต finishDate (รับค่า null ได้)
+        m.setFinishDate(req.getFinishDate());
 
         // ✅ อัปเดตฟิลด์ใหม่
         if (req.getMaintainType() != null)       m.setMaintainType(req.getMaintainType());
