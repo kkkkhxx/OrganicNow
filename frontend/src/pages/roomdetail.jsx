@@ -17,6 +17,7 @@ function RoomDetail() {
   const [assetGroups, setAssetGroups] = useState([]);
   const [assetsToShow, setAssetsToShow] = useState(10);
   const [selectedGroup, setSelectedGroup] = useState("all"); // for asset group filter
+  const allUsedAssetIds = new Set(); // ✅ เพิ่ม Set สำหรับเก็บ asset IDs ที่ถูกใช้แล้ว
 
   useEffect(() => {
     const fetchRoomDetail = async () => {
@@ -27,7 +28,7 @@ function RoomDetail() {
         ]);
 
         // Error handling if data is missing or invalid
-        if (!roomRes.data || !assetRes.data || !groupRes.data) {
+        if (!roomRes.data || !assetRes.data) {
           throw new Error("Missing data from response.");
         }
 
@@ -78,7 +79,7 @@ function RoomDetail() {
         updatedAssets = updatedAssets.sort((a, b) => a.assetId - b.assetId);
 
         setRoomData(roomData);
-        setAssetGroups(assetGroups);
+        setAssetGroups([]); // ✅ ใช้ empty array หรือข้อมูลจาก API ถ้ามี
         setForm((prevState) => ({
           ...prevState,
           allAssets: updatedAssets,
@@ -97,6 +98,13 @@ function RoomDetail() {
   if (loading) return <p className="text-center mt-5">Loading...</p>;
   if (error) return <p className="text-center mt-5">{error}</p>;
   if (!roomData) return <p className="text-center mt-5">No data found</p>;
+
+  // ✅ Helper function: Filter assets by selected group
+  const filterAssetsByGroup = (groupName) => {
+    if (!form.allAssets) return [];
+    if (groupName === "all") return form.allAssets;
+    return form.allAssets.filter(asset => asset.assetGroupName === groupName);
+  };
 
   // Helper: Package color badge
   const getPackageBadgeClass = (contractName) => {
