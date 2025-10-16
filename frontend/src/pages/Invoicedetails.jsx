@@ -140,60 +140,29 @@ function InvoiceDetails() {
     return s.length >= 10 ? s.slice(0, 10) : s;
   };
 
-  // คำนวณ bill & net เฉพาะเมื่อแก้ไข unit (ใช้ค่าจาก API เป็นหลัก)
+  // ✅ คำนวณ water และ electricity bill อัตโนมัติเมื่อ unit เปลี่ยน
   useEffect(() => {
-    // ถ้ามีข้อมูลจาก API แล้ว ไม่ต้องคำนวณใหม่
-    if (initial.water && initial.electricity) {
-      return; // ใช้ค่าจาก API
-    }
-
-    // คำนวณใหม่เฉพาะเมื่อไม่มีค่าจาก API หรือกำลังแก้ไข
     const waterBill = round(toNumber(invoiceForm.waterUnit) * RATE_WATER_PER_UNIT);
     const elecBill = round(toNumber(invoiceForm.electricityUnit) * RATE_ELEC_PER_UNIT);
     const rent = toNumber(invoiceForm.rent);
 
+    // ✅ เก็บค่า penalty เดิมไว้ ไม่คำนวณใหม่ เพื่อให้รู้ว่าบิลไหนเคยติด penalty
+    const existingPenalty = toNumber(invoiceForm.penalty);
     const subtotal = round(rent + waterBill + elecBill + SERVICE_FEE);
-
-    // ✅ Penalty Logic: 10% ของค่าเช่าถ้าเกิน penaltyDate และ status = Incomplete
-    const today = new Date();
-    let penaltyDueDate;
-    
-    // ใช้ penalty date ที่ตั้งไว้ หรือ create date + 30 วันเป็น default
-    if (invoiceForm.penaltyDate) {
-      penaltyDueDate = new Date(invoiceForm.penaltyDate);
-    } else {
-      const createDate = new Date(invoiceForm.createDate);
-      penaltyDueDate = new Date(createDate.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 วัน
-    }
-    
-    const isOverdue = today > penaltyDueDate;
-    
-    let penalty = 0;
-    if (isOverdue && (invoiceForm.status === "incomplete" || invoiceForm.status === "pending")) {
-      penalty = Math.round(rent * 0.1); // 10% ของค่าเช่า
-      const overdueDays = Math.ceil((today - penaltyDueDate) / (1000 * 60 * 60 * 24));
-      console.log(`💰 Penalty applied: ${penalty} (10% of rent ${rent}) - Overdue by ${overdueDays} days from penalty date ${penaltyDueDate.toLocaleDateString()}`);
-    }
-    
-    const net = subtotal + penalty;
+    const net = subtotal + existingPenalty;
 
     setInvoiceForm((p) => ({
       ...p,
       water: waterBill,
       electricity: elecBill,
-      penalty,
       amount: net,
+      // penalty ไม่เปลี่ยน - ใช้ค่าเดิมจาก backend
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     invoiceForm.waterUnit,
     invoiceForm.electricityUnit,
     invoiceForm.rent,
-    invoiceForm.payDate,
-    invoiceForm.createDate,
-    invoiceForm.status, // เพื่อคำนวณ penalty ใหม่
-    invoiceForm.penaltyDate, // เพื่อคำนวณ penalty จาก penalty date ที่ตั้งไว้
+    // ✅ เอา penalty-related dependencies ออก เพื่อไม่ให้คำนวณ penalty ใหม่
   ]);
 
   //============= cleanupBackdrops =============//
@@ -217,6 +186,11 @@ function InvoiceDetails() {
     const netInt = Math.round(toNumber(invoiceForm.amount));
 
     const payload = {
+      // ✅ ส่งข้อมูล unit ไปด้วยเพื่อให้ backend อัปเดต
+      waterUnit: Number(invoiceForm.waterUnit) || 0,
+      electricityUnit: Number(invoiceForm.electricityUnit) || 0,
+      waterRate: RATE_WATER_PER_UNIT,
+      electricityRate: RATE_ELEC_PER_UNIT,
       // dueDate: (ไม่มี UI ก็ไม่ส่ง)
       invoiceStatus: mapStatusToCode(invoiceForm.status),
       payDate: invoiceForm.payDate ? `${invoiceForm.payDate}T00:00:00` : null,
@@ -265,25 +239,53 @@ function InvoiceDetails() {
         payDate: d2str(updated.payDate) || p.payDate,
       }));
 
-      // ปิด modal อย่างถูกต้อง
-      const el = document.getElementById("editRequestModal");
-      if (el) {
-        const inst = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
-        el.addEventListener(
-          "hidden.bs.modal",
-          () => {
-            try {
-              inst.dispose();
-            } finally {
-              cleanupBackdrops();
-            }
-          },
-          { once: true }
-        );
-        inst.hide();
-      } else {
-        cleanupBackdrops();
+      // ✅ ปิด modal อย่างถูกต้องและ cleanup
+      const modalElement = document.getElementById("editRequestModal");
+      if (modalElement) {
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+          modalInstance.hide();
+          // รอให้ modal ปิดเสร็จก่อน cleanup
+          modalElement.addEventListener('hidden.bs.modal', () => {
+            modalInstance.dispose();
+            cleanupBackdrops();
+          }, { once: true });
+        } else {
+          // ถ้าไม่มี instance แล้ว ให้ cleanup เลย
+          cleanupBackdrops();
+        }
       }
+
+      // ✅ Fetch ข้อมูลใหม่หลัง Save เพื่อให้ penalty อัปเดต real-time
+      setTimeout(async () => {
+        try {
+          const response = await fetch(`${API_BASE}/invoice/${invoiceId || invoiceForm.id}`, {
+            credentials: "include",
+          });
+          
+          if (response.ok) {
+            const freshData = await response.json();
+            console.log("Fresh data after save:", freshData);
+            
+            setInvoiceForm(prev => ({
+              ...prev,
+              rent: Number(freshData.rent) || prev.rent,
+              water: Number(freshData.water) || prev.water,
+              electricity: Number(freshData.electricity) || prev.electricity,
+              waterUnit: Number(freshData.waterUnit) || prev.waterUnit,
+              electricityUnit: Number(freshData.electricityUnit) || prev.electricityUnit,
+              amount: Number(freshData.netAmount || freshData.amount) || prev.amount,
+              penalty: Number(freshData.penaltyTotal || freshData.penalty) || prev.penalty,
+              status: (freshData.invoiceStatus === 1 ? "complete" : 
+                      freshData.invoiceStatus === 2 ? "cancelled" : "pending"),
+              payDate: freshData.payDate ? d2str(freshData.payDate) : prev.payDate,
+              penaltyDate: freshData.penaltyAppliedAt ? d2str(freshData.penaltyAppliedAt) : prev.penaltyDate,
+            }));
+          }
+        } catch (error) {
+          console.error("Failed to refresh data after save:", error);
+        }
+      }, 300);
     } catch (err) {
       console.error("Save failed:", err);
       alert(`Update failed: ${err.message}`);
@@ -487,14 +489,15 @@ function InvoiceDetails() {
                   <input type="date" className="form-control" value={invoiceForm.createDate} disabled />
                 </div>
                 <div className="col-md-6">
-                  <label className="form-label">Rent</label>
+                  <label className="form-label">Rent (from package)</label>
                   <input
-                    type="number"
-                    min={0}
+                    type="text"
                     className="form-control"
-                    value={invoiceForm.rent}
-                    onChange={(e) => setInvoiceForm((p) => ({ ...p, rent: toNumber(e.target.value) }))}
+                    value={`฿${invoiceForm.rent.toLocaleString()}`}
+                    disabled
+                    title="Rent is fixed based on package"
                   />
+                  
                 </div>
 
                 <div className="col-md-6">
