@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ContractTypeControllerIntegrationTest {
 
-    // 🐘 ใช้ Postgres จริงผ่าน Testcontainers
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17-alpine")
             .withDatabaseName("organicnow_test")
@@ -35,7 +34,7 @@ class ContractTypeControllerIntegrationTest {
             .withPassword("testpass");
 
     @DynamicPropertySource
-    static void registerDataSourceProperties(DynamicPropertyRegistry registry) {
+    static void configureProps(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
@@ -47,10 +46,8 @@ class ContractTypeControllerIntegrationTest {
 
     @BeforeEach
     void setup() {
-        // ล้างข้อมูลและ reset id
         jdbcTemplate.execute("TRUNCATE TABLE contract_type RESTART IDENTITY CASCADE");
 
-        // เพิ่มข้อมูลตัวอย่าง
         contractTypeRepository.save(ContractType.builder()
                 .name("Standard Contract")
                 .duration(12)
@@ -66,24 +63,26 @@ class ContractTypeControllerIntegrationTest {
     @Test
     void testGetAllContractTypes_ShouldReturnList() throws Exception {
         mockMvc.perform(get("/contract-types")
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
+                // ตรวจ array ขนาด 2
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].name", is("Standard Contract")))
-                .andExpect(jsonPath("$[1].duration", is(6)));
+                // ตรวจว่ามีชื่อเหล่านี้อยู่ในลิสต์
+                .andExpect(jsonPath("$[*].name", containsInAnyOrder("Standard Contract", "Short Term")))
+                .andExpect(jsonPath("$[*].duration", containsInAnyOrder(12, 6)));
     }
 
     // ✅ 2. GET /contract-types/{id}
     @Test
     void testGetContractTypeById_ShouldReturnCorrectType() throws Exception {
-        ContractType saved = contractTypeRepository.findAll().get(0);
+        ContractType first = contractTypeRepository.findAll().get(0);
 
-        mockMvc.perform(get("/contract-types/{id}", saved.getId())
-                        .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/contract-types/{id}", first.getId())
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id", is(saved.getId().intValue())))
-                .andExpect(jsonPath("$.name", is("Standard Contract")))
-                .andExpect(jsonPath("$.duration", is(12)));
+                .andExpect(jsonPath("$.id", is(first.getId().intValue())))
+                .andExpect(jsonPath("$.name", is(first.getName())))
+                .andExpect(jsonPath("$.duration", is(first.getDuration())));
     }
 
     // ✅ 3. POST /contract-types
@@ -104,14 +103,16 @@ class ContractTypeControllerIntegrationTest {
                 .andExpect(jsonPath("$.name", is("Long Term")))
                 .andExpect(jsonPath("$.duration", is(24)));
 
-        assert contractTypeRepository.existsById(3L);
+        // ตรวจใน DB
+        long total = contractTypeRepository.count();
+        assert total == 3 : "Expected 3 records but found " + total;
     }
 
     // ✅ 4. DELETE /contract-types/{id}
     @Test
     void testDeleteContractType_ShouldRemoveEntity() throws Exception {
-        ContractType existing = contractTypeRepository.findAll().get(0);
-        Long id = existing.getId();
+        ContractType first = contractTypeRepository.findAll().get(0);
+        Long id = first.getId();
 
         mockMvc.perform(delete("/contract-types/{id}", id))
                 .andExpect(status().isNoContent());
@@ -122,7 +123,10 @@ class ContractTypeControllerIntegrationTest {
     // ✅ 5. GET /contract-types/{id} not found
     @Test
     void testGetContractTypeById_NotFound_ShouldReturn404() throws Exception {
-        mockMvc.perform(get("/contract-types/{id}", 999L))
-                .andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/contract-types/{id}", 999L)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                // เช็กเฉพาะ field message ที่ Spring Boot ส่งออกมา
+                .andExpect(jsonPath("$.message", containsString("ContractType not found")));
     }
 }
