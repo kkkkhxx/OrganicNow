@@ -29,25 +29,25 @@ public class RoomController {
     private final RoomService roomService;
 
     // ✅ ดึงข้อมูลห้องแบบละเอียด
-    @GetMapping("/{id}")
-    public ResponseEntity<RoomDetailDto> getRoomById(@PathVariable Long id) {
+    @GetMapping("/{id}/detail")
+    public ResponseEntity<RoomDetailDto> getRoomDetail(@PathVariable Long id) {
         RoomDetailDto dto = roomService.getRoomDetail(id);
         if (dto == null) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(dto);
     }
 
-    // ✅ ดึงข้อมูลห้องแบบละเอียด (สำหรับ legacy)
-    @GetMapping("/{id}/detail")
-    public ResponseEntity<RoomDetailDto> getRoomDetail(@PathVariable Long id) {
-        return getRoomById(id);
-    }
-
     // ✅ ดึงข้อมูลห้องทั้งหมด
-    @GetMapping("/list")
+    @GetMapping
     public ResponseEntity<List<RoomDetailDto>> getAllRooms() {
         List<RoomDetailDto> rooms = roomService.getAllRooms();
         if (rooms.isEmpty()) return ResponseEntity.noContent().build();
         return ResponseEntity.ok(rooms);
+    }
+
+    // ✅ ดึงข้อมูลห้องทั้งหมด (สำหรับ /rooms endpoint)
+    @GetMapping("/list")
+    public ResponseEntity<List<RoomDetailDto>> getAllRoomsList() {
+        return getAllRooms();
     }
 
     // ✅ เพิ่ม Asset เข้า Room
