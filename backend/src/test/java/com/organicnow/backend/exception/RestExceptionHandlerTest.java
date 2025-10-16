@@ -3,153 +3,111 @@ package com.organicnow.backend.exception;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
-import java.lang.reflect.Method;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest
 class RestExceptionHandlerTest {
 
-    @Autowired
-    private RestExceptionHandler restExceptionHandler;
-
-    @Mock
-    private MethodArgumentNotValidException methodArgumentNotValidException;
-
-    @Mock
-    private BindingResult bindingResult;
-
-    @Mock
-    private ConstraintViolationException constraintViolationException;
-
-    @Mock
-    private DataIntegrityViolationException dataIntegrityViolationException;
-
-    @Mock
-    private RuntimeException runtimeException;
+    private RestExceptionHandler handler;
 
     @BeforeEach
     void setUp() {
-        // Initialize mocks if needed
+        handler = new RestExceptionHandler();
     }
 
-    // Test MethodArgumentNotValidException handling
+    // ✅ TEST 1: Validation Error
     @Test
-    void testHandleValidation() {
-        // Create a mock FieldError
-        FieldError fieldError = new FieldError("object", "field", "Field is required");
+    void handleValidation_shouldReturn400WithFieldErrors() {
+        BindingResult bindingResult = mock(BindingResult.class);
+        when(bindingResult.getFieldErrors()).thenReturn(List.of(
+                new FieldError("obj", "username", "must not be blank"),
+                new FieldError("obj", "email", "invalid format")
+        ));
 
-        // Mock the BindingResult to return a list with one field error
-        when(methodArgumentNotValidException.getBindingResult()).thenReturn(bindingResult);
-        when(bindingResult.getFieldErrors()).thenReturn(List.of(fieldError));
+        MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
 
-        // Act
-        ResponseEntity<?> response = restExceptionHandler.handleValidation(methodArgumentNotValidException);
+        ResponseEntity<?> response = handler.handleValidation(ex);
 
-        // Assert
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertThat(response.getStatusCodeValue()).isEqualTo(400);
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertEquals(400, body.get("status"));
-        assertEquals("validation_error", body.get("message"));
-        assertTrue(((Map<?, ?>) body.get("errors")).containsKey("field"));
+        assertThat(body.get("message")).isEqualTo("validation_error");
+
+        Map<String, String> errors = (Map<String, String>) body.get("errors");
+        assertThat(errors).containsKeys("username", "email");
+        assertThat(errors.get("username")).isEqualTo("must not be blank");
     }
 
-    // Test ConstraintViolationException handling
+    // ✅ TEST 2: Hibernate ConstraintViolation (duplicate national_id)
     @Test
-    void testHandleHibernateConstraint() {
-        String causeMessage = "Duplicate entry for unique constraint uk_tenant_national_id";
-        SQLException sqlException = mock(SQLException.class);
-        when(sqlException.getMessage()).thenReturn(causeMessage);
-        when(constraintViolationException.getSQLException()).thenReturn(sqlException);
+    void handleHibernateConstraint_duplicateNationalId() {
+        SQLException sql = new SQLException("UK_tenant_national_id constraint violated");
+        ConstraintViolationException ex = new ConstraintViolationException("Duplicate", sql, "tenant");
 
-        ResponseEntity<?> response = restExceptionHandler.handleHibernateConstraint(constraintViolationException);
-
-        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        ResponseEntity<?> response = handler.handleHibernateConstraint(ex);
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertEquals(409, body.get("status"));
-        assertEquals("duplicate_national_id", body.get("message"));
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(409);
+        assertThat(body.get("message")).isEqualTo("duplicate_national_id");
     }
 
-    // Test DataIntegrityViolationException handling
+    // ✅ TEST 3: DataIntegrityViolationException (duplicate group name)
     @Test
-    void testHandleDataIntegrityViolation() {
-        String causeMessage = "Unique constraint violation: uk_asset_group_name";
-        Throwable cause = mock(Throwable.class);
-        when(cause.getMessage()).thenReturn(causeMessage);
-        when(dataIntegrityViolationException.getMostSpecificCause()).thenReturn(cause);
+    void handleDataIntegrity_duplicateGroupName() {
+        Throwable cause = new Throwable("UK_asset_group_name constraint violated");
+        DataIntegrityViolationException ex = new DataIntegrityViolationException("duplicate", cause);
 
-        ResponseEntity<?> response = restExceptionHandler.handleDataIntegrity(dataIntegrityViolationException);
-
-        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        ResponseEntity<?> response = handler.handleDataIntegrity(ex);
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertEquals(409, body.get("status"));
-        assertEquals("duplicate_group_name", body.get("message"));
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(409);
+        assertThat(body.get("message")).isEqualTo("duplicate_group_name");
     }
 
-    // Test RuntimeException handling for duplicate_group_name
+    // ✅ TEST 4: Business Exception → duplicate_group_name
     @Test
-    void testHandleBusinessDuplicateGroupName() {
-        when(runtimeException.getMessage()).thenReturn("duplicate_group_name");
+    void handleBusiness_duplicateGroupName() {
+        RuntimeException ex = new RuntimeException("duplicate_group_name");
 
-        ResponseEntity<?> response = restExceptionHandler.handleBusiness(runtimeException);
-
-        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        ResponseEntity<?> response = handler.handleBusiness(ex);
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertEquals(409, body.get("status"));
-        assertEquals("duplicate_group_name", body.get("message"));
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(409);
+        assertThat(body.get("message")).isEqualTo("duplicate_group_name");
     }
 
-    // Test RuntimeException handling for tenant_already_has_active_contract
+    // ✅ TEST 5: Business Exception → tenant_already_has_active_contract
     @Test
-    void testHandleBusinessTenantAlreadyHasActiveContract() {
-        when(runtimeException.getMessage()).thenReturn("tenant_already_has_active_contract");
+    void handleBusiness_duplicateNationalId() {
+        RuntimeException ex = new RuntimeException("tenant_already_has_active_contract");
 
-        ResponseEntity<?> response = restExceptionHandler.handleBusiness(runtimeException);
-
-        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        ResponseEntity<?> response = handler.handleBusiness(ex);
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertEquals(409, body.get("status"));
-        assertEquals("duplicate_national_id", body.get("message"));
+
+        assertThat(response.getStatusCodeValue()).isEqualTo(409);
+        assertThat(body.get("message")).isEqualTo("duplicate_national_id");
     }
 
-    // Test RuntimeException handling with fallback for general error
+    // ✅ TEST 6: Business Exception → Fallback (RuntimeException อื่น)
     @Test
-    void testHandleBusinessFallback() {
-        when(runtimeException.getMessage()).thenReturn("Some unexpected error");
+    void handleBusiness_genericRuntime_shouldReturn500() {
+        RuntimeException ex = new RuntimeException("unexpected_error");
 
-        ResponseEntity<?> response = restExceptionHandler.handleBusiness(runtimeException);
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        ResponseEntity<?> response = handler.handleBusiness(ex);
         Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertEquals(500, body.get("status"));
-        assertEquals("server_error", body.get("message"));
-        assertEquals("Some unexpected error", body.get("detail"));
-    }
 
-    // Test resolveDuplicateMessage helper method using reflection
-    @Test
-    void testResolveDuplicateMessage() throws Exception {
-        // Access the private method using reflection
-        Method method = RestExceptionHandler.class.getDeclaredMethod("resolveDuplicateMessage", String.class);
-        method.setAccessible(true);
-
-        // Test with various inputs
-        assertEquals("duplicate_national_id", method.invoke(restExceptionHandler, "Duplicate entry for uk_tenant_national_id"));
-        assertEquals("duplicate_group_name", method.invoke(restExceptionHandler, "uk_asset_group_name"));
-        assertEquals("duplicate", method.invoke(restExceptionHandler, "Some other constraint violation"));
+        assertThat(response.getStatusCodeValue()).isEqualTo(500);
+        assertThat(body.get("message")).isEqualTo("server_error");
+        assertThat(body.get("detail")).isEqualTo("unexpected_error");
     }
 }

@@ -40,12 +40,19 @@ class CreateMaintainRequestTest {
         LocalDateTime expectedScheduledDate = LocalDateTime.of(2025, 5, 1, 10, 0, 0, 0);
         LocalDateTime expectedFinishDate = LocalDateTime.of(2025, 5, 2, 10, 0, 0, 0);
 
-        // Act
-        CreateMaintainRequest request = new CreateMaintainRequest(
-                expectedTargetType, expectedRoomId, expectedRoomNumber, expectedRoomAssetId,
-                expectedIssueCategory, expectedIssueTitle, expectedIssueDescription,
-                expectedCreateDate, expectedScheduledDate, expectedFinishDate
-        );
+        // Act: ใช้ Builder แทน constructor
+        CreateMaintainRequest request = CreateMaintainRequest.builder()
+                .targetType(expectedTargetType)
+                .roomId(expectedRoomId)
+                .roomNumber(expectedRoomNumber)
+                .roomAssetId(expectedRoomAssetId)
+                .issueCategory(expectedIssueCategory)
+                .issueTitle(expectedIssueTitle)
+                .issueDescription(expectedIssueDescription)
+                .createDate(expectedCreateDate)
+                .scheduledDate(expectedScheduledDate)
+                .finishDate(expectedFinishDate)
+                .build();
 
         // Assert
         assertEquals(expectedTargetType, request.getTargetType());
@@ -59,6 +66,7 @@ class CreateMaintainRequestTest {
         assertEquals(expectedScheduledDate, request.getScheduledDate());
         assertEquals(expectedFinishDate, request.getFinishDate());
     }
+
 
     @Test
     void testBuilder() {

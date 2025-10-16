@@ -46,19 +46,31 @@ class CreateInvoiceRequestTest {
         Integer expectedWaterRate = 20;
         Integer expectedElectricityUnit = 10;
         Integer expectedElectricityRate = 15;
-        String expectedCreateDate = "2025-02-28";
+        String expectedCreateDate = "2025-02-28"; // ให้เป็น String ตามที่กำหนดใน DTO
         Integer expectedInvoiceStatus = 1; // Complete
         Integer expectedWater = 100;
         Integer expectedElectricity = 150;
         Integer expectedElecUnit = 10;
 
-        // Act
-        CreateInvoiceRequest request = new CreateInvoiceRequest(expectedContractId, expectedDueDate, expectedSubTotal,
-                expectedPenaltyTotal, expectedNetAmount, expectedNotes,
-                expectedRentAmount, expectedWaterUnit, expectedWaterRate,
-                expectedElectricityUnit, expectedElectricityRate,
-                expectedCreateDate, expectedInvoiceStatus, expectedWater,
-                expectedElectricity, expectedElecUnit);
+        // Act: ใช้ Builder ในการสร้างอ็อบเจ็กต์
+        CreateInvoiceRequest request = CreateInvoiceRequest.builder()
+                .contractId(expectedContractId)
+                .dueDate(expectedDueDate)
+                .subTotal(expectedSubTotal)
+                .penaltyTotal(expectedPenaltyTotal)
+                .netAmount(expectedNetAmount)
+                .notes(expectedNotes)
+                .rentAmount(expectedRentAmount)
+                .waterUnit(expectedWaterUnit)
+                .waterRate(expectedWaterRate)
+                .electricityUnit(expectedElectricityUnit)
+                .electricityRate(expectedElectricityRate)
+                .createDate(expectedCreateDate) // ใช้เป็น String ตามที่กำหนดใน DTO
+                .invoiceStatus(expectedInvoiceStatus)
+                .water(expectedWater)
+                .electricity(expectedElectricity)
+                .elecUnit(expectedElecUnit)
+                .build();
 
         // Assert
         assertEquals(expectedContractId, request.getContractId());
@@ -78,6 +90,8 @@ class CreateInvoiceRequestTest {
         assertEquals(expectedElectricity, request.getElectricity());
         assertEquals(expectedElecUnit, request.getElecUnit());
     }
+
+
 
     @Test
     void testBuilder() {
