@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
 import axios from "axios";
@@ -7,8 +7,7 @@ import "../assets/css/roomdetail.css";
 import useMessage from "../component/useMessage";
 
 function RoomDetail() {
-  const { roomId } = useParams();
-  const navigate = useNavigate();
+  const { roomId: id } = useParams(); // เอา roomId มา rename เป็น id  const navigate = useNavigate();
   const [roomData, setRoomData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -21,9 +20,16 @@ function RoomDetail() {
   useEffect(() => {
     const fetchRoomDetail = async () => {
       try {
-        const [roomRes, assetRes] = await Promise.all([
-          axios.get(`http://localhost:8080/room/${roomId}/detail`, { withCredentials: true }),
-          axios.get("http://localhost:8080/assets/all", { withCredentials: true }),
+        const [roomRes, assetRes, groupRes] = await Promise.all([
+          axios.get(`http://localhost:8080/room/${id}/detail`, {
+            withCredentials: true,
+          }),
+          axios.get("http://localhost:8080/assets/all", {
+            withCredentials: true,
+          }),
+          axios.get("http://localhost:8080/asset-group/list", {
+            withCredentials: true,
+          }),
         ]);
 
         // Error handling if data is missing or invalid
@@ -32,25 +38,21 @@ function RoomDetail() {
         }
 
         const roomData = roomRes.data;
-        
-        // Debug: ดูข้อมูลที่ backend ส่งมา  
-        console.log("Complete room data:", roomData);
-        console.log("Tenant info:", {
-          firstName: roomData.firstName,
-          lastName: roomData.lastName,
-          email: roomData.email,
-          phoneNumber: roomData.phoneNumber,
-          contractTypeName: roomData.contractTypeName,
-          signDate: roomData.signDate,
-          startDate: roomData.startDate,
-          endDate: roomData.endDate,
-          status: roomData.status
+        const allAssets = assetRes.data.result;
+        const assetGroups = groupRes.data;
+
+        // Get all assets already used in other rooms
+        const allUsedAssetIds = new Set(); // to store assets used in any room
+        const roomsRes = await axios.get("http://localhost:8080/room", {
+          withCredentials: true,
         });
-        
-        const roomAssets = Array.isArray(roomData.assets) ? roomData.assets : [];
-        const allAssets = Array.isArray(assetRes.data.result)
-          ? assetRes.data.result
-          : [];
+        roomsRes.data.forEach((room) => {
+          if (room.assets) {
+            room.assets.forEach((asset) => {
+              allUsedAssetIds.add(asset.assetId); // Add asset to set if it's used in any room
+            });
+          }
+        });
 
         // Filter out assets that are already used in other rooms
         const availableAssets = allAssets.filter(
@@ -67,12 +69,12 @@ function RoomDetail() {
         }));
 
         // Add assets already in the room (always checked)
-        const currentRoomAssets = roomData.assets.map((asset) => ({
+        const roomAssets = roomData.assets.map((asset) => ({
           ...asset,
           checked: true, // assets already in the room are checked
         }));
 
-        updatedAssets = updatedAssets.concat(currentRoomAssets);
+        updatedAssets = updatedAssets.concat(roomAssets);
 
         // Sort the assets by assetId or assetName (ascending)
         updatedAssets = updatedAssets.sort((a, b) => a.assetId - b.assetId);
@@ -92,11 +94,30 @@ function RoomDetail() {
     };
 
     fetchRoomDetail();
-  }, [roomId]);
+  }, [id]);
 
-  if (loading) return <p className="text-center mt-5">Loading...</p>;
-  if (error) return <p className="text-center mt-5">{error}</p>;
-  if (!roomData) return <p className="text-center mt-5">No data found</p>;
+  const filterAssetsByGroup = (group) => {
+    console.log("Filtering by group:", group); // Log selected group for debugging
+    if (group === "all") {
+      return form.allAssets; // Show all assets if "all" is selected
+    }
+
+    // Filter by assetType that matches the selected group
+    return form.allAssets.filter((asset) => asset.assetType === group);
+  };
+
+  // Sync assets when modal opens
+  useEffect(() => {
+    const modalEl = document.getElementById("editRoomModal");
+    modalEl?.addEventListener("show.bs.modal", () => {
+      if (roomData) {
+        setForm((s) => ({
+          ...s,
+          allAssets: s.allAssets, // Keep all assets as they are without filtering
+        }));
+      }
+    });
+  }, [roomData]);
 
   // Helper: Package color badge
   const getPackageBadgeClass = (contractName) => {
@@ -121,13 +142,12 @@ function RoomDetail() {
             <div className="card border-0 shadow-sm bg-white rounded-3 mb-4">
               <div className="card-body d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center gap-2">
-                  <span
-                    className="breadcrumb-link text-primary"
-                    style={{ cursor: "pointer" }}
-                    onClick={() => navigate("/roommanagement")}
+                  <Link
+                    to="/roommanagement"
+                    className="breadcrumb-link text-primary text-decoration-none"
                   >
                     Room Management
-                  </span>
+                  </Link>
                   <span className="text-muted">›</span>
                   <span className="breadcrumb-current">
                     {roomData.roomNumber}
@@ -177,49 +197,52 @@ function RoomDetail() {
 
                     <hr />
                     <h5 className="card-title">Current Tenant</h5>
-                    {roomData.firstName || roomData.lastName || roomData.phoneNumber || roomData.email ? (
-                      <>
-                        <p>
-                          <strong>First Name:</strong> {roomData.firstName || "N/A"}
-                        </p>
-                        <p>
-                          <strong>Last Name:</strong> {roomData.lastName || "N/A"}
-                        </p>
-                        <p>
-                          <strong>Phone Number:</strong> {roomData.phoneNumber || "N/A"}
-                        </p>
-                        <p>
-                          <strong>Email:</strong> {roomData.email || "N/A"}
-                        </p>
-                        <p>
-                          <strong>Package:</strong>
-                          <span className="value">
-                            <span
-                              className={`package-badge badge ${getPackageBadgeClass(
-                                roomData.contractTypeName || "-"
-                              )}`}
-                            >
-                              {roomData.contractTypeName || "No Package"}
-                            </span>
-                          </span>
-                        </p>
-                        <p>
-                          <strong>Sign Date:</strong> {roomData.signDate ? new Date(roomData.signDate).toLocaleDateString() : "N/A"}
-                        </p>
-                        <p>
-                          <strong>Start Date:</strong> {roomData.startDate ? new Date(roomData.startDate).toLocaleDateString() : "N/A"}
-                        </p>
-                        <p>
-                          <strong>End Date:</strong> {roomData.endDate ? new Date(roomData.endDate).toLocaleDateString() : "N/A"}
-                        </p>
-                      </>
-                    ) : (
-                      <div className="text-center text-muted py-3">
-                        <i className="bi bi-person-x" style={{ fontSize: '2rem' }}></i>
-                        <p className="mt-2 mb-0">No current tenant</p>
-                        <small>This room is available for rent</small>
-                      </div>
-                    )}
+                    <p>
+                      <strong>First Name:</strong> {roomData.firstName}
+                    </p>
+                    <p>
+                      <strong>Last Name:</strong> {roomData.lastName}
+                    </p>
+                    <p>
+                      <strong>Phone Number:</strong> {roomData.phoneNumber}
+                    </p>
+                    <p>
+                      <strong>Email:</strong> {roomData.email}
+                    </p>
+                    <p>
+                      <strong>Package:</strong>
+                      <span className="value">
+                        <span
+                          className={`package-badge badge ${getPackageBadgeClass(
+                            roomData.contractName ||
+                              roomData.contractTypeName ||
+                              "-"
+                          )}`}
+                        >
+                          {roomData.contractName ||
+                            roomData.contractTypeName ||
+                            "-"}
+                        </span>
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Sign Date:</strong>{" "}
+                      {roomData.signDate
+                        ? new Date(roomData.signDate).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                    <p>
+                      <strong>Start Date:</strong>{" "}
+                      {roomData.startDate
+                        ? new Date(roomData.startDate).toLocaleDateString()
+                        : "N/A"}
+                    </p>
+                    <p>
+                      <strong>End Date:</strong>{" "}
+                      {roomData.endDate
+                        ? new Date(roomData.endDate).toLocaleDateString()
+                        : "N/A"}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -331,30 +354,30 @@ function RoomDetail() {
                 .filter((a) => a.checked && !a.isMock)
                 .map((a) => a.assetId);
 
-                  // 🟢 2. ส่ง request อัปเดต asset ในห้อง
-                  await axios.put(
-                    `http://localhost:8080/room/${roomId}/assets`,
-                    selectedIds,
-                    { withCredentials: true }
-                  );
+              // Send the selected asset IDs to the server
+              await axios.put(
+                `http://localhost:8080/room/${id}/assets`,
+                selectedIds,
+                { withCredentials: true }
+              );
 
-                  // 🟢 3. อัปเดตข้อมูลพื้นฐานของห้อง
-                  await axios.put(
-                    `http://localhost:8080/room/${roomId}`,
-                    {
-                      roomFloor: form.roomFloor,
-                      roomNumber: form.roomNumber,
-                      status: form.status,
-                    },
-                    { withCredentials: true }
-                  );
+              // Update room information
+              await axios.put(
+                `http://localhost:8080/room/${id}`,
+                {
+                  roomFloor: form.roomFloor,
+                  roomNumber: form.roomNumber,
+                  status: form.status,
+                },
+                { withCredentials: true }
+              );
 
-                  // 🟢 4. โหลดข้อมูลใหม่ (refresh)
-                  const refreshed = await axios.get(
-                    `http://localhost:8080/room/${roomId}/detail`,
-                    { withCredentials: true }
-                  );
-                  setRoomData(refreshed.data);
+              // Refresh room data
+              const refreshed = await axios.get(
+                `http://localhost:8080/room/${id}/detail`,
+                { withCredentials: true }
+              );
+              setRoomData(refreshed.data);
 
               // Show success message
               showMessageSave("Room updated successfully!");
