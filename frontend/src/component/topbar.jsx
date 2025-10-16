@@ -4,7 +4,6 @@ import { Badge } from "primereact/badge";
 import { Avatar } from "primereact/avatar";
 import { Menu } from "primereact/menu";
 import { profileMenuItems, settingsMenuItems } from "./menuitem";
-import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import NotificationBell from "./NotificationBell";
 
@@ -16,14 +15,13 @@ import "../assets/css/topbar.css";
 export default function Topbar({ title = "", icon = "" }) {
   const profileMenu = useRef(null);
   const settingsMenu = useRef(null);
-  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    // ✅ แจ้งเตือนก่อน logout
+    // ✅ แจ้งเตือนก่อน logout (ถ้าต้องการ)
     if (window.confirm("Are you sure you want to logout?")) {
-      logout();
-      navigate("/login", { replace: true });
+      // ไม่มี auth context แล้ว สามารถ navigate ไปหน้าอื่นได้เลย
+      navigate("/dashboard", { replace: true });
     }
   };
 
@@ -69,7 +67,7 @@ export default function Topbar({ title = "", icon = "" }) {
             onClick={(e) => profileMenu.current.toggle(e)}
           >
             <Avatar icon="pi pi-user" shape="circle" className="topbar-avatar" />
-            <span className="topbar-username">{user?.email || "User"}</span>
+            <span className="topbar-username">Admin User</span>
             <Menu model={enhancedProfileMenuItems} popup ref={profileMenu} appendTo={document.body} />
           </div>
         </div>
