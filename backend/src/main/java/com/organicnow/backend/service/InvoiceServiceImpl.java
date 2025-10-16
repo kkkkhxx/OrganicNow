@@ -325,7 +325,7 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .payMethod(invoice.getPayMethod())
                 .subTotal(invoice.getSubTotal())
                 .penaltyTotal(invoice.getPenaltyTotal())
-                .netAmount(invoice.getNetAmount())
+                .netAmount(invoice.getSubTotal() + invoice.getPenaltyTotal()) // ✅ คำนวณ real-time
                 .penaltyAppliedAt(invoice.getPenaltyAppliedAt())
                 // ✅ ใช้ข้อมูล tenant ปัจจุบัน
                 .firstName(currentFirstName)

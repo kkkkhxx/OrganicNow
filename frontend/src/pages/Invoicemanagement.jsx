@@ -162,7 +162,7 @@ function InvoiceManagement() {
   // ✅ ดึงข้อมูลห้องจาก backend
   const fetchRooms = async () => {
     try {
-      const res = await fetch(`${API_BASE}/room`, {
+      const res = await fetch(`${API_BASE}/room/list`, {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
@@ -763,7 +763,7 @@ function InvoiceManagement() {
                         <td className="align-middle text-start">{item.rent.toLocaleString()}</td>
                         <td className="align-middle text-start">{item.water.toLocaleString()}</td>
                         <td className="align-middle text-start">{item.electricity.toLocaleString()}</td>
-                        <td className="align-middle text-start ">{(item.rent + item.water + item.electricity).toLocaleString()}</td>
+                        <td className="align-middle text-start ">{item.amount.toLocaleString()}</td>
                         <td className="align-middle text-start">
                           <span
                             className={`badge ${
