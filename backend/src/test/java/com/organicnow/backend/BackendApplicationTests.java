@@ -7,7 +7,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class BackendApplicationTest {
+class BackendApplicationTests {
 
     // ✅ ตรวจสอบว่ามี @EnableScheduling
     @Test
