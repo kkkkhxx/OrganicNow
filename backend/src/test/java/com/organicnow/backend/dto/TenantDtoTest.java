@@ -14,6 +14,7 @@ public class TenantDtoTest {
         String lastName = "Doe";
         String phoneNumber = "1234567890";
         String email = "john.doe@example.com";
+        String nationalId = "123456789"; // เพิ่มค่าของ nationalId
         String room = "A305";
         Integer floor = 3;
         Long roomId = 101L;
@@ -30,10 +31,10 @@ public class TenantDtoTest {
         BigDecimal rentAmountSnapshot = new BigDecimal("1500.00");
         Integer status = 1; // Active
 
-        // Act
+        // Act: สร้างอ็อบเจ็กต์จาก constructor ที่ใช้พารามิเตอร์ครบถ้วน
         TenantDto dto = new TenantDto(
                 contractId, firstName, lastName, floor, room, roomId, packageId, contractTypeId,
-                contractName, startDate, endDate, phoneNumber, email, status
+                contractName, startDate, endDate, phoneNumber, email, nationalId, status
         );
 
         // กำหนดค่า signDate โดยตรงใน Unit Test
@@ -45,6 +46,8 @@ public class TenantDtoTest {
         assertEquals(startDate, dto.getStartDate(), "Start date should match");
         assertEquals(endDate, dto.getEndDate(), "End date should match");
     }
+
+
 
     @Test
     void testSetterAndGetter() {

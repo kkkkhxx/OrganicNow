@@ -119,7 +119,7 @@ const useMessage = () => {
       buttonsStyling: false,
       confirmButtonText: "Confirm",
       cancelButtonText: "Cancel",
-      customClass: {  
+      customClass: {
         confirmButton: "btn form-Button-Swal-Delete btn-confirm me-3",
         cancelButton: "btn form-Button-Swal-Delete btn-cancel",
       },

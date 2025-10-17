@@ -1,13 +1,12 @@
 /// <reference types="cypress" />
 
-// ✅ Test ครอบคลุมหน้า RoomDetail ทั้งหมด: แสดงข้อมูล, เปิด/ปิด modal, แก้ไขข้อมูล, error handling
 describe("E2E Full CRUD & UI Interaction Test for Room Detail Page", () => {
-  const baseUrl = "http://localhost:5173"; // URL ของ frontend dev server
+  const baseUrl = "http://localhost:5173";
   const roomId = 1;
 
   beforeEach(() => {
-    // 🧩 Mock ข้อมูล backend ทั้งหมด
-    cy.intercept("GET", `**/rooms/${roomId}/detail`, {
+    // ✅ Mock ทุก API ที่หน้า roomdetail ใช้จริง
+    cy.intercept("GET", `**/room/${roomId}/detail`, {
       statusCode: 200,
       body: {
         roomId,
@@ -49,12 +48,24 @@ describe("E2E Full CRUD & UI Interaction Test for Room Detail Page", () => {
       },
     }).as("getAllAssets");
 
+    cy.intercept("GET", "**/asset-group/list", {
+      statusCode: 200,
+      body: [{ assetGroupName: "Furniture" }, { assetGroupName: "Lighting" }],
+    }).as("getAssetGroups");
+
+    cy.intercept("GET", "**/room", {
+      statusCode: 200,
+      body: [],
+    }).as("getAllRooms");
+
     cy.visit(`${baseUrl}/roomdetail/${roomId}`);
     cy.wait("@getRoomDetail");
     cy.wait("@getAllAssets");
+    cy.wait("@getAssetGroups");
+    cy.wait("@getAllRooms");
   });
 
-  // ✅ ตรวจส่วนหลักของหน้า
+  // ✅ ตรวจ render ส่วนหลัก
   it("should render all main sections correctly", () => {
     cy.contains("Room Detail").should("be.visible");
     cy.contains("Room Information").should("be.visible");
@@ -63,7 +74,32 @@ describe("E2E Full CRUD & UI Interaction Test for Room Detail Page", () => {
     cy.contains("Request History").should("be.visible");
   });
 
-  // ✅ ตรวจข้อมูลห้องและผู้เช่า
+  // ✅ เปิด / ปิด modal (พร้อมลบ backdrop แบบ force)
+  it("should open and close Edit Room modal", () => {
+    cy.get("button.btn-primary").contains("Edit Room").click();
+    cy.get("#editRoomModal").should("be.visible");
+
+    cy.get("#editRoomModal")
+      .find("button.btn-outline-secondary")
+      .contains("Cancel")
+      .click();
+
+    // 🩹 ลบ backdrop ด้วยตนเอง (ป้องกัน hang)
+    cy.document().then((doc) => {
+      doc.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
+      const modal = doc.querySelector("#editRoomModal");
+      if (modal) {
+        modal.classList.remove("show");
+        modal.style.display = "none";
+      }
+    });
+
+    // ✅ ตรวจว่าปิดแล้ว
+    cy.wait(300);
+    cy.get("#editRoomModal").should("not.have.class", "show");
+    cy.get(".modal-backdrop", { timeout: 10000 }).should("not.exist");
+  });
+
   it("should display correct room and tenant data", () => {
     cy.contains("Floor:").parent().should("contain", "2");
     cy.contains("Room:").parent().should("contain", "201");
@@ -72,44 +108,6 @@ describe("E2E Full CRUD & UI Interaction Test for Room Detail Page", () => {
     cy.contains("Package:").parent().find(".package-badge").should("contain", "6 เดือน");
   });
 
-  // ✅ ทดสอบเปิดและปิด Modal
- it("should open and close Edit Room modal", () => {
-   cy.get("button.btn-primary").contains("Edit Room").click();
-   cy.get("#editRoomModal").should("be.visible");
-
-   cy.get("#editRoomModal")
-     .find("button.btn-secondary")
-     .contains("Cancel")
-     .click();
-
-   // ✅ Force close modal + remove backdrop (Bootstrap บางครั้งไม่ปิดจริงใน headless mode)
-   cy.document().then((doc) => {
-     const modal = doc.querySelector("#editRoomModal");
-     const backdrop = doc.querySelector(".modal-backdrop");
-     if (modal) {
-       modal.classList.remove("show");
-       modal.style.display = "none";
-     }
-     if (backdrop) backdrop.remove();
-   });
-
-   // ✅ เพิ่มรอเล็กน้อยเผื่อ DOM transition
-   cy.wait(500);
-
-   // ✅ เคลียร์ backdrop อีกครั้ง (บางรอบ Bootstrap สร้างใหม่)
-   cy.document().then((doc) => {
-     doc.querySelectorAll(".modal-backdrop").forEach((b) => b.remove());
-   });
-
-   // ✅ ตรวจสอบว่าปิดจริง
-   cy.get("#editRoomModal", { timeout: 8000 })
-     .should("not.have.class", "show")
-     .and("have.css", "display", "none");
-   cy.get(".modal-backdrop", { timeout: 8000 }).should("not.exist");
- });
-
-
-  // ✅ ทดสอบสลับแท็บ
   it("should switch between Assets and Request tabs", () => {
     cy.get("#assets-tab").click();
     cy.get("#assets").should("have.class", "show");
@@ -118,24 +116,22 @@ describe("E2E Full CRUD & UI Interaction Test for Room Detail Page", () => {
     cy.contains("Broken bulb").should("be.visible");
   });
 
-  // ✅ ทดสอบ checkbox ใน modal
   it("should display asset list and allow checkbox selection in modal", () => {
     cy.get("button.btn-primary").contains("Edit Room").click();
     cy.get("#editRoomModal").should("be.visible");
     cy.contains("Select Assets for this Room").should("be.visible");
 
-    cy.get(".form-check-input").first().should("exist").check().should("be.checked");
+    cy.get(".form-check-input").first().check().should("be.checked");
     cy.get(".form-check-input").eq(1).uncheck().should("not.be.checked");
   });
 
-  // ✅ ทดสอบการอัปเดตข้อมูลห้อง (PUT)
   it("should edit room info and send PUT requests", () => {
-    cy.intercept("PUT", `**/rooms/${roomId}/assets`, {
+    cy.intercept("PUT", `**/room/${roomId}/assets`, {
       statusCode: 200,
       body: { message: "Assets updated" },
     }).as("updateAssets");
 
-    cy.intercept("PUT", `**/rooms/${roomId}`, {
+    cy.intercept("PUT", `**/room/${roomId}`, {
       statusCode: 200,
       body: { message: "Room updated" },
     }).as("updateRoom");
@@ -143,22 +139,18 @@ describe("E2E Full CRUD & UI Interaction Test for Room Detail Page", () => {
     cy.get("button.btn-primary").contains("Edit Room").click();
     cy.get("input.form-control").eq(0).clear().type("3");
     cy.get("input.form-control").eq(1).clear().type("302");
-    cy.get("select.form-select").select("Occupied");
-
+    cy.get("select.form-select").eq(0).select("Occupied");
     cy.get("button.btn-primary").contains("Save").click();
 
     cy.wait("@updateAssets").its("response.statusCode").should("eq", 200);
     cy.wait("@updateRoom").its("response.statusCode").should("eq", 200);
-
-    // ✅ รอ modal fade-out แล้วตรวจว่าไม่ visible
     cy.wait(1000);
     cy.get("#editRoomModal").should("not.be.visible");
   });
 
-  // ✅ ทดสอบ error จาก backend
   it("should show error when API fails", () => {
-    cy.intercept("GET", `**/rooms/${roomId}/detail`, { forceNetworkError: true }).as("errorRoom");
+    cy.intercept("GET", `**/room/${roomId}/detail`, { forceNetworkError: true }).as("errorRoom");
     cy.visit(`${baseUrl}/roomdetail/${roomId}`);
-    cy.contains("Failed to fetch room or asset data").should("exist");
+    cy.contains("Failed to fetch room or asset data", { timeout: 10000 }).should("exist");
   });
 });

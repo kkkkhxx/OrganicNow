@@ -76,17 +76,17 @@ describe("E2E Full CRUD & UI Test for Invoice Details", () => {
     cy.get("#editRequestModal").should("not.have.class", "show");
   });
 
-  // ✅ ปรับตรวจแบบ dynamic ตามค่าจริงที่ render
+  // ✅ ปรับ test ให้สอดคล้องกับ component จริง
   it("should update form fields and recalculate bills", () => {
     cy.contains("Edit Invoice").click();
     cy.get("#editRequestModal").should("have.class", "show");
 
-    cy.get('input[type="number"]').eq(0).clear().type("4200"); // rent
-    cy.get('input[type="number"]').eq(1).clear().type("5"); // water unit
-    cy.get('input[type="number"]').eq(2).clear().type("210"); // elec
+    // ✅ มีเพียง 2 ช่อง number คือ waterUnit + electricityUnit
+    cy.get('input[type="number"]').eq(0).clear().type("5");   // water unit
+    cy.get('input[type="number"]').eq(1).clear().type("210"); // elec unit
     cy.wait(500);
 
-    // ตรวจ water bill ไม่ fix เป็นค่าเดียว — อ่านจาก DOM จริง
+    // ✅ ตรวจ water bill ไม่ fix เป็นค่าเดียว — อ่านจาก DOM จริง
     cy.get("#editRequestModal label").contains("Water bill")
       .parent()
       .find("input[disabled]")
@@ -94,19 +94,20 @@ describe("E2E Full CRUD & UI Test for Invoice Details", () => {
       .then((val) => {
         const num = Number(val.replace(/,/g, ""));
         expect(num).to.be.greaterThan(0);
-        expect(num % 30).to.equal(0);
+        expect(num % 30).to.equal(0); // rate 30/unit
       });
 
-    // ตรวจ NET ต้องมีค่ามากกว่า rent
+    // ✅ ตรวจ NET ต้องมีค่ามากกว่า rent (4000)
     cy.get("#editRequestModal label").contains(/^NET$/)
       .parent()
       .find("input[disabled]")
       .invoke("val")
       .then((val) => {
         const net = Number(val.replace(/,/g, ""));
-        expect(net).to.be.greaterThan(4200);
+        expect(net).to.be.greaterThan(4000);
       });
   });
+
 
   // ✅ เพิ่ม wait + fallback check เฉพาะใน modal
   it("should set payDate automatically when status changed to complete", () => {

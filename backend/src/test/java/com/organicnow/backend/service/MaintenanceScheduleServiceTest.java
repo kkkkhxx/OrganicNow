@@ -150,10 +150,19 @@ class MaintenanceScheduleServiceTest {
 
     @Test
     void testDeleteSchedule() {
+        // Mock การค้นหาข้อมูลใน scheduleRepository
+        when(scheduleRepository.findById(100L)).thenReturn(Optional.of(schedule));
+
+        // Mock การลบใน scheduleRepository
         doNothing().when(scheduleRepository).deleteById(100L);
+
+        // ทดสอบฟังก์ชัน deleteSchedule
         scheduleService.deleteSchedule(100L);
+
+        // ตรวจสอบว่า method deleteById ถูกเรียกเพียงครั้งเดียว
         verify(scheduleRepository, times(1)).deleteById(100L);
     }
+
 
     @Test
     void testMarkAsDone() {

@@ -18,11 +18,18 @@ public class UpdateMaintainRequestTest {
         LocalDateTime scheduledDate = LocalDateTime.of(2025, 10, 20, 10, 0, 0, 0);
         LocalDateTime finishDate = LocalDateTime.of(2025, 10, 21, 10, 0, 0, 0);
 
-        // Act: Create object using constructor
-        UpdateMaintainRequest request = new UpdateMaintainRequest(
-                targetType, roomId, roomNumber, roomAssetId, issueCategory,
-                issueTitle, issueDescription, scheduledDate, finishDate
-        );
+        // Act: ใช้ Builder ในการสร้างอ็อบเจ็กต์
+        UpdateMaintainRequest request = UpdateMaintainRequest.builder()
+                .targetType(targetType)
+                .roomId(roomId)
+                .roomNumber(roomNumber)
+                .roomAssetId(roomAssetId)
+                .issueCategory(issueCategory)
+                .issueTitle(issueTitle)
+                .issueDescription(issueDescription)
+                .scheduledDate(scheduledDate)
+                .finishDate(finishDate)
+                .build();
 
         // Assert: Verify that the values are correctly set
         assertEquals(targetType, request.getTargetType(), "Target type should match");
@@ -51,5 +58,6 @@ public class UpdateMaintainRequestTest {
         nullRequest.setRoomId(102L);
         assertEquals(102L, nullRequest.getRoomId(), "Room ID should be updated");
     }
+
 }
 
