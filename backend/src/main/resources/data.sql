@@ -30,14 +30,14 @@ INSERT INTO contract_type (contract_name, duration) VALUES
     ON CONFLICT (contract_type_id) DO NOTHING;
 
 -- ========================
--- Package Plan
+-- Package Plan (ต้องมาหลัง Contract Type)
 -- ========================
 INSERT INTO package_plan (contract_type_id, price, is_active) VALUES
                                                                   (1,  8000.00, 1),
                                                                   (2, 15000.00, 1),
                                                                   (3, 21000.00, 1),
                                                                   (4, 28000.00, 1)
-    ON CONFLICT (package_id) DO NOTHING;
+    ON CONFLICT (contract_type_id) DO NOTHING;
 
 -- ========================
 -- Contract (อัปเดตวันที่ให้เป็นปัจจุบัน)
@@ -97,7 +97,7 @@ FROM generate_series(1, 24) AS gs
     ON CONFLICT DO NOTHING;
 
 -- ========================
--- Assign Asset to Each Room
+-- Assign Asset to Each Room (ต้องมาหลัง asset ถูกสร้างแล้ว)
 -- ========================
 INSERT INTO room_asset (room_id, asset_id)
 SELECT r.room_id, a.asset_id
@@ -110,7 +110,8 @@ FROM room r
                      'wardrobe-' || LPAD(r.room_id::text, 3, '0')
         )
     )
-    ON CONFLICT DO NOTHING;
+WHERE r.room_id <= 24  -- จำกัดเฉพาะ 24 ห้องที่มีข้อมูล
+    ON CONFLICT (room_id, asset_id) DO NOTHING;
 
 -- ========================
 -- Maintain
