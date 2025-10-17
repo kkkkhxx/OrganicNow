@@ -166,16 +166,23 @@ jobs:
       - name: Wait for frontend to be up
         run: |
           set -euo pipefail
-          for i in {1..120}; do
-            # เช็คว่า frontend container รันอยู่และ port 5173 เปิดแล้ว
+          for i in {1..60}; do
+            # เช็คว่า frontend container รันอยู่และ nginx serving files
             if curl -fsS "$HEALTH_URL_FRONTEND" >/dev/null 2>&1; then
               echo "Frontend is up ✅"
               exit 0
             fi
-            echo "Waiting for frontend... ($i/120)"
+            # เช็คว่า container รันอยู่ไหม
+            if ! docker ps --format "table {{.Names}}" | grep -q "organicnow-frontend"; then
+              echo "Frontend container not running! Checking logs..."
+              docker logs organicnow-frontend || echo "No logs available"
+              docker ps
+              exit 1
+            fi
+            echo "Waiting for frontend... ($i/60)"
             sleep 3
           done
-          echo "Frontend not up in time"; docker ps; exit 1
+          echo "Frontend not up in time"; docker ps; docker logs organicnow-frontend; exit 1
       # ----------------------------
       # ✅ Run Integration Tests บน network เดียวกับ compose
       # ใช้ image Maven (เหมือน stage builder) โดย mount โค้ด backend เข้าไป

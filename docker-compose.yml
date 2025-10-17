@@ -5,12 +5,9 @@ services:
     build: ./frontend
     container_name: organicnow-frontend
     ports:
-      - "5173:5173"
+      - "5173:80"  # ✅ แก้ไข: Nginx runs on port 80 inside container
     environment:
       - VITE_API_URL=http://localhost:8080
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
 
