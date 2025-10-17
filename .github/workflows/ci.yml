@@ -48,6 +48,7 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres123
+          SPRING_SQL_INIT_MODE: never
         run: |
           chmod +x mvnw || true
           ./mvnw -q -U clean verify
@@ -81,6 +82,7 @@ jobs:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: postgres123
+          SPRING_SQL_INIT_MODE: never
           # ✅ บังคับ base-path และ exposure สำหรับโปรไฟล์ test
           MANAGEMENT_ENDPOINTS_WEB_BASE_PATH: /actuator
           MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
@@ -218,6 +220,7 @@ jobs:
               -Dspring.datasource.url="jdbc:postgresql://${POSTGRES_SERVICE_NAME}:5432/${POSTGRES_DB_NAME}" \
               -Dspring.datasource.username=postgres \
               -Dspring.datasource.password=postgres123 \
+              -Dspring.sql.init.mode=never \
               -Dtest='*IntegrationTest'
       - name: Upload Integration Test Reports  # ✅ ADDED
         if: always()
