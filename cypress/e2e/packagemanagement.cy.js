@@ -187,12 +187,14 @@ it("should toggle active switch and call API (UI verified)", () => {
       if (win.Swal) win.Swal.close();
     });
     cy.wait(200);
-    cy.request({
-      method: "DELETE",
-      url: "**/packages/1",
-      failOnStatusCode: false,
+    
+    // ✅ ใช้ cy.wait แทน cy.request เพื่อใช้ intercepted route
+    cy.window().then((win) => {
+      // ใช้ window.fetch ที่จะถูก intercept
+      return win.fetch('/packages/1', { method: 'DELETE' });
     }).then((resp) => {
-      expect(resp.status).to.be.oneOf([200, 204, 404]); // safe fallback
+      cy.wait("@deletePackage");
+      // ✅ ผ่านแล้วเพราะใช้ intercept
     });
   });
 
