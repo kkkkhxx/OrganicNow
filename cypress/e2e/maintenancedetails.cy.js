@@ -37,7 +37,7 @@ describe("E2E Full CRUD & UI Interaction Test for Maintenance Details", () => {
     
     // ✅ รอให้หน้าโหลดและมีข้อมูล (ใช้ข้อมูลที่เรา stub)
     cy.get("body", { timeout: 20000 }).should("be.visible");
-    cy.get("body").should("contain", "Water leakage").or("contain", "205");
+    cy.get("body").should("contain", "Water leakage").and("contain", "205");
   });
 
   // ✅ TEST 1: โหลดข้อมูลได้ถูกต้อง
