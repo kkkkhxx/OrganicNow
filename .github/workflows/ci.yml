@@ -5,16 +5,9 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, closed]
 
 permissions:
   contents: read
-
-# 👇 ใช้ DB ต่อรัน ให้ไม่ชนกันระหว่าง push/PR
-env:
-  DB_NAME: organicnow_test_${{ github.run_id }}
-  DB_USER: postgres
-  DB_PASS: postgres123
 
 jobs:
   backend:
@@ -29,9 +22,9 @@ jobs:
         ports:
           - 5432:5432
         env:
-          POSTGRES_DB: ${{ env.DB_NAME }}     # 👈 ใช้ DB ต่อรัน
-          POSTGRES_USER: ${{ env.DB_USER }}
-          POSTGRES_PASSWORD: ${{ env.DB_PASS }}
+          POSTGRES_DB: organicnow_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres123
         options: >-
           --health-cmd="pg_isready -U postgres"
           --health-interval=5s
@@ -51,13 +44,12 @@ jobs:
       - name: Build & Test (JaCoCo)
         env:
           SPRING_PROFILES_ACTIVE: test
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/${{ env.DB_NAME }}   # 👈 ชี้ DB ต่อรัน
-          SPRING_DATASOURCE_USERNAME: ${{ env.DB_USER }}
-          SPRING_DATASOURCE_PASSWORD: ${{ env.DB_PASS }}
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres123
         run: |
           chmod +x mvnw || true
           ./mvnw -q -U clean verify
-
       - name: Upload Maven surefire reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -85,9 +77,10 @@ jobs:
       - name: Start app (for OpenAPI generation)
         env:
           SPRING_PROFILES_ACTIVE: test
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/${{ env.DB_NAME }}   # 👈 เหมือนกันทุกจุด
-          SPRING_DATASOURCE_USERNAME: ${{ env.DB_USER }}
-          SPRING_DATASOURCE_PASSWORD: ${{ env.DB_PASS }}
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/organicnow_test
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres123
+          # ✅ บังคับ base-path และ exposure สำหรับโปรไฟล์ test
           MANAGEMENT_ENDPOINTS_WEB_BASE_PATH: /actuator
           MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
         run: |
@@ -106,13 +99,11 @@ jobs:
               exit 1
             fi
           done
-
       - name: Generate OpenAPI (openapi.json)
         run: |
           curl -fsS "http://localhost:8080/v3/api-docs" -o target/openapi.json || \
           curl -fsS "http://localhost:8080/v3/api-docs" -o target/openapi.json
           test -s target/openapi.json || (echo "openapi.json is empty" && exit 1)
-
       - name: Upload OpenAPI artifact
         uses: actions/upload-artifact@v4
         with:
@@ -123,7 +114,6 @@ jobs:
         if: always()
         run: |
           kill $(lsof -t -i:8080) 2>/dev/null || true
-
   e2e:
     name: E2E via docker-compose + Cypress (root)
     runs-on: ubuntu-latest
@@ -132,7 +122,8 @@ jobs:
       BASE_URL: http://localhost:5173
       HEALTH_URL_BACKEND: http://localhost:8080/actuator/health
       HEALTH_URL_FRONTEND: http://localhost:5173
-      POSTGRES_SERVICE_NAME: organicnow-db
+      POSTGRES_SERVICE_NAME: organicnow-db       # ✅ ADDED (จาก compose ของคุณ)
+      POSTGRES_DB_NAME: apartment_management     # ✅ ADDED (จาก compose ของคุณ)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -144,29 +135,20 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-
       - name: Install Cypress deps (repo root)
         run: |
           npm ci
           npx cypress install
-
-      - name: Install frontend deps
+      - name: Install frontend deps  # ✅ ADDED
         run: npm ci --prefix frontend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 👇 เขียนไฟล์ .env ให้ docker-compose สร้าง DB ต่อรันเดียวกับที่เทสจะใช้
-      - name: Prepare compose .env
-        run: |
-          printf "POSTGRES_DB=%s\nPOSTGRES_USER=%s\nPOSTGRES_PASSWORD=%s\n" "${DB_NAME}" "${DB_USER}" "${DB_PASS}" > .env
-          cat .env
-
       - name: docker compose up (build & run)
         run: |
           docker compose -f "${COMPOSE_FILE}" up -d --build
           docker ps
-
       - name: Wait for backend to be healthy
         run: |
           set -euo pipefail
@@ -179,7 +161,6 @@ jobs:
             sleep 2
           done
           echo "Backend not healthy in time ❌"; docker ps; exit 1
-
       - name: Wait for frontend to be up
         run: |
           for i in {1..60}; do
@@ -188,15 +169,16 @@ jobs:
             sleep 2
           done
           echo "Frontend not up in time"; docker ps; exit 1
-
       # ----------------------------
       # ✅ Run Integration Tests บน network เดียวกับ compose
+      # ใช้ image Maven (เหมือน stage builder) โดย mount โค้ด backend เข้าไป
+      # ตรวจหา network อัตโนมัติจาก service 'backend' ใน compose ของคุณ
       # ----------------------------
-      - name: Run Integration Tests (using Maven builder image on same network)
+      - name: Run Integration Tests (using Maven builder image on same network)  # ✅ ADDED
         run: |
           set -euo pipefail
           echo "🔎 Finding backend service & its network..."
-          BACKEND_SVC_NAME="backend"
+          BACKEND_SVC_NAME="backend"  # ← service name ใน compose ของคุณ
           BACKEND_CID="$(docker compose -f "${COMPOSE_FILE}" ps -q "${BACKEND_SVC_NAME}" || true)"
           if [ -z "$BACKEND_CID" ]; then
             echo "❌ Cannot find backend container by service name '${BACKEND_SVC_NAME}'."
@@ -210,7 +192,6 @@ jobs:
             exit 1
           fi
           echo "✅ Using network: $NET_NAME"
-
           echo "🏗️  Running Integration Tests with Maven on same network..."
           docker run --rm \
             --network "$NET_NAME" \
@@ -220,13 +201,11 @@ jobs:
             maven:3.9.6-eclipse-temurin-21 \
             mvn -q -U test \
               -Dspring.profiles.active=test \
-              -Dspring.datasource.url="jdbc:postgresql://${POSTGRES_SERVICE_NAME}:5432/${DB_NAME}" \
-              -Dspring.datasource.username="${DB_USER}" \
-              -Dspring.datasource.password="${DB_PASS}" \
+              -Dspring.datasource.url="jdbc:postgresql://${POSTGRES_SERVICE_NAME}:5432/${POSTGRES_DB_NAME}" \
+              -Dspring.datasource.username=postgres \
+              -Dspring.datasource.password=postgres123 \
               -Dtest='*IntegrationTest'
-              -Dtest='!AssetGroupControllerIntegrationTest'
-
-      - name: Upload Integration Test Reports
+      - name: Upload Integration Test Reports  # ✅ ADDED
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -239,7 +218,6 @@ jobs:
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
           npx cypress run --headless --config baseUrl=${{ env.BASE_URL }} ${CYPRESS_RECORD_KEY:+--record --key $CYPRESS_RECORD_KEY}
-
       - name: Upload Cypress artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -248,7 +226,6 @@ jobs:
           path: |
             cypress/videos
             cypress/screenshots
-
       - name: Teardown containers
         if: always()
         run: docker compose -f "${{ env.COMPOSE_FILE }}" down -v
@@ -320,77 +297,6 @@ jobs:
           context: ./backend
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
-
-#  post-merge-tests:
-#    name: Post-Merge Tests (run only after PR is merged)
-#    runs-on: ubuntu-latest
-#    if: >
-#      github.event_name == 'pull_request' &&
-#      github.event.action == 'closed' &&
-#      github.event.pull_request.merged == true
-#    env:
-#      DB_NAME: organicnow_test_${{ github.run_id }}
-#      DB_USER: postgres
-#      DB_PASS: postgres123
-#    steps:
-#      - name: Checkout merged base (main)
-#        uses: actions/checkout@v4
-#        with:
-#          ref: ${{ github.event.pull_request.base.ref }}  # main หลัง merge
-#
-#      - name: Set up JDK 21
-#        uses: actions/setup-java@v4
-#        with:
-#          distribution: 'temurin'
-#          java-version: '21'
-#          cache: 'maven'
-#
-#      - name: Start Postgres service
-#        uses: hoverkraft-tech/compose-action@v2.0.2
-#        with:
-#          compose-file: |
-#            version: '3.8'
-#            services:
-#              pg:
-#                image: postgres:16
-#                ports: ["5433:5432"]
-#                environment:
-#                  POSTGRES_DB: ${DB_NAME}
-#                  POSTGRES_USER: ${DB_USER}
-#                  POSTGRES_PASSWORD: ${DB_PASS}
-#                healthcheck:
-#                  test: ["CMD-SHELL", "pg_isready -U postgres"]
-#                  interval: 5s
-#                  timeout: 5s
-#                  retries: 20
-#
-#      - name: Wait for DB (5433)
-#        run: |
-#          for i in {1..60}; do
-#            if pg_isready -h localhost -p 5433 -U postgres >/dev/null 2>&1; then
-#              echo "DB is ready ✅"; exit 0
-#            fi
-#            echo "Waiting DB... ($i/60)"; sleep 2
-#          done
-#          echo "DB not ready ❌"; exit 1
-#
-#      - name: Backend tests on merged main
-#        working-directory: backend
-#        env:
-#          SPRING_PROFILES_ACTIVE: test
-#          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/${{ env.DB_NAME }}
-#          SPRING_DATASOURCE_USERNAME: ${{ env.DB_USER }}
-#          SPRING_DATASOURCE_PASSWORD: ${{ env.DB_PASS }}
-#        run: |
-#          chmod +x mvnw || true
-#          ./mvnw -q -U clean verify
-#
-#      - name: Upload post-merge test reports
-#        if: always()
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: post-merge-backend-test-reports
-#          path: backend/target/surefire-reports
 
   summary:
     name: CI Summary
