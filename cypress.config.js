@@ -10,6 +10,7 @@ const requireFromFrontend = (mod) => {
 };
 
 module.exports = defineConfig({
+    projectId: "5zi2ou",
     video: false,
     retries: { runMode: 1, openMode: 0 },
 
