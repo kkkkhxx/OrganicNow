@@ -126,6 +126,8 @@ jobs:
       BASE_URL: http://localhost:5173
       HEALTH_URL_BACKEND: http://localhost:8080/actuator/health
       HEALTH_URL_FRONTEND: http://localhost:5173
+      POSTGRES_SERVICE_NAME: organicnow-db       # ✅ ADDED (จาก compose ของคุณ)
+      POSTGRES_DB_NAME: apartment_management     # ✅ ADDED (จาก compose ของคุณ)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -142,6 +144,9 @@ jobs:
         run: |
           npm ci
           npx cypress install
+
+      - name: Install frontend deps  # ✅ ADDED
+        run: npm ci --prefix frontend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -173,12 +178,57 @@ jobs:
           done
           echo "Frontend not up in time"; docker ps; exit 1
 
+      # ----------------------------
+      # ✅ Run Integration Tests บน network เดียวกับ compose
+      # ใช้ image Maven (เหมือน stage builder) โดย mount โค้ด backend เข้าไป
+      # ตรวจหา network อัตโนมัติจาก service 'backend' ใน compose ของคุณ
+      # ----------------------------
+      - name: Run Integration Tests (using Maven builder image on same network)  # ✅ ADDED
+        run: |
+          set -euo pipefail
+          echo "🔎 Finding backend service & its network..."
+          BACKEND_SVC_NAME="backend"  # ← service name ใน compose ของคุณ
+          BACKEND_CID="$(docker compose -f "${COMPOSE_FILE}" ps -q "${BACKEND_SVC_NAME}" || true)"
+          if [ -z "$BACKEND_CID" ]; then
+            echo "❌ Cannot find backend container by service name '${BACKEND_SVC_NAME}'."
+            docker compose -f "${COMPOSE_FILE}" ps
+            exit 1
+          fi
+
+          NET_NAME="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$BACKEND_CID" | head -n1)"
+          if [ -z "$NET_NAME" ]; then
+            echo "❌ Cannot detect docker network of backend container."
+            docker inspect "$BACKEND_CID"
+            exit 1
+          fi
+          echo "✅ Using network: $NET_NAME"
+
+          echo "🏗️  Running Integration Tests with Maven on same network..."
+          docker run --rm \
+            --network "$NET_NAME" \
+            -v "${{ github.workspace }}/backend:/app" \
+            -w /app \
+            maven:3.9.6-eclipse-temurin-21 \
+            mvn -q -U test \
+              -Dspring.profiles.active=test \
+              -Dspring.datasource.url="jdbc:postgresql://${POSTGRES_SERVICE_NAME}:5432/${POSTGRES_DB_NAME}" \
+              -Dspring.datasource.username=postgres \
+              -Dspring.datasource.password=postgres123 \
+              -Dtest='*IntegrationTest'
+
+      - name: Upload Integration Test Reports  # ✅ ADDED
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports
+          path: backend/target/surefire-reports
+
       - name: Run Cypress E2E (using root cypress.config.js)
         env:
           CYPRESS_baseUrl: ${{ env.BASE_URL }}
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
-          npx cypress run --headless --config baseUrl=${{ env.BASE_URL }} ${CYPRESS_RECORD_KEY:+--record --key $CYPRESS_RECORD_KEY}  # ✅ CHANGED
+          npx cypress run --headless --config baseUrl=${{ env.BASE_URL }} ${CYPRESS_RECORD_KEY:+--record --key $CYPRESS_RECORD_KEY}
 
       - name: Upload Cypress artifacts
         if: always()
