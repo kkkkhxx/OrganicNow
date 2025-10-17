@@ -14,9 +14,6 @@ RUN mvn clean package -Dmaven.test.skip=true && ls -l /app/target
 FROM eclipse-temurin:21-jdk-alpine
 WORKDIR /app
 
-# Install curl for health check
-RUN apk add --no-cache curl
-
 # 👇 ระบุชื่อไฟล์ตรง ๆ
 COPY --from=builder /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
 

@@ -5,12 +5,14 @@ services:
     build: ./frontend
     container_name: organicnow-frontend
     ports:
-      - "5173:80"  # เปลี่ยนจาก 5173:5173 เป็น 5173:80
+      - "5173:5173"
     environment:
-      - VITE_API_URL=/api  # เปลี่ยนจาก http://localhost:8080
+      - VITE_API_URL=http://localhost:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
-      backend:
-        condition: service_healthy  # รอ backend health check ผ่าน
+      - backend
 
   backend:
     build: ./backend
@@ -22,16 +24,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres123
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - SPRING_PROFILES_ACTIVE=docker
     depends_on:
-      database:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      - database
 
   database:
     image: postgres:17-alpine
@@ -45,12 +39,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      # ❌ ไม่ต้อง mount init.sql แล้ว เพราะใช้ data.sql ของ Spring Boot แทน
 
 volumes:
   postgres_data:
