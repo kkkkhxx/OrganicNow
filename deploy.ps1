@@ -50,6 +50,10 @@ Write-Host "✅ Images pulled successfully" -ForegroundColor Green
 # Apply Kubernetes manifests
 Write-Host "🔄 Applying Kubernetes deployments..." -ForegroundColor Yellow
 
+# 0. Database secrets first
+Write-Host "   🔐 Applying database secrets..." -ForegroundColor Gray
+kubectl apply -f db-secret.yaml -n organicnow
+
 # 1. Database first
 Write-Host "   📊 Deploying database..." -ForegroundColor Gray
 kubectl apply -f postgres-pvc.yaml -n organicnow
