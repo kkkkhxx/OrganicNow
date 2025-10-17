@@ -178,7 +178,7 @@ jobs:
           CYPRESS_baseUrl: ${{ env.BASE_URL }}
           CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
         run: |
-          npx cypress run --headless ${CYPRESS_RECORD_KEY:+--record --key $CYPRESS_RECORD_KEY}
+          npx cypress run --headless --config baseUrl=${{ env.BASE_URL }} ${CYPRESS_RECORD_KEY:+--record --key $CYPRESS_RECORD_KEY}  # ✅ CHANGED
 
       - name: Upload Cypress artifacts
         if: always()
