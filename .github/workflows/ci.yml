@@ -173,17 +173,7 @@ jobs:
             echo "Waiting for frontend... ($i/120)"
             sleep 3
           done
-<<<<<<< HEAD
-          echo "Frontend not up in time ❌"
-          echo "Container status:"
-          docker ps
-          echo "Frontend logs:"
-          docker compose -f "${COMPOSE_FILE}" logs frontend || true
-          exit 1
-
-=======
           echo "Frontend not up in time"; docker ps; exit 1
->>>>>>> origin/main
       # ----------------------------
       # ✅ Run Integration Tests บน network เดียวกับ compose
       # ใช้ image Maven (เหมือน stage builder) โดย mount โค้ด backend เข้าไป
@@ -324,8 +314,24 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
 
   summary:
-    name: CI Summary
+    name: CI/CD Summary (Build Complete - Ready for Manual Deploy)
     runs-on: ubuntu-latest
     needs: [backend, e2e, docker-push-frontend, docker-push-backend]
+    if: always()
     steps:
-      - run: echo "Backend tests + E2E (compose) + Push frontend & backend images finished."
+      - name: Build Summary
+        run: |
+          echo "🎉 CI/CD Build Pipeline Summary:"
+          echo "================================="
+          echo "✅ Backend Tests: ${{ needs.backend.result }}"
+          echo "✅ E2E Tests: ${{ needs.e2e.result }}"
+          echo "✅ Frontend Image Build: ${{ needs.docker-push-frontend.result }}"
+          echo "✅ Backend Image Build: ${{ needs.docker-push-backend.result }}"
+          echo ""
+          echo "📦 Latest Images Built:"
+          echo "   - ghcr.io/kkkkhxx/organicnow-frontend:latest"
+          echo "   - ghcr.io/kkkkhxx/organicnow-backend:latest"
+          echo ""
+          echo "🚀 Ready for Manual Deployment!"
+          echo "   Run: ./deploy.ps1"
+          echo "   Then access: http://localhost:8080"
