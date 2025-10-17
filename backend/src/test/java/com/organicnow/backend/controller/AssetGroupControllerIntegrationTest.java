@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -50,6 +51,9 @@ class AssetGroupControllerIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
     }
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @Autowired private MockMvc mockMvc;
     @Autowired private AssetGroupRepository assetGroupRepository;
     @Autowired private AssetRepository assetRepository;
@@ -59,6 +63,8 @@ class AssetGroupControllerIntegrationTest {
 
     @BeforeEach
     void setup() {
+        jdbc.execute("DELETE FROM notifications");
+        jdbc.execute("DELETE FROM maintenance_schedule");
         // ✅ ลบตารางลูกก่อนเพื่อล้าง FK (ลำดับสำคัญมาก)
         entityManager.createNativeQuery("DELETE FROM notifications").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM maintenance_schedule").executeUpdate();
@@ -70,7 +76,6 @@ class AssetGroupControllerIntegrationTest {
         assetGroupRepository.save(AssetGroup.builder().assetGroupName("Furniture").build());
         assetGroupRepository.save(AssetGroup.builder().assetGroupName("Electronics").build());
     }
-
 
     // ✅ 1. GET /asset-group/list
     @Test
