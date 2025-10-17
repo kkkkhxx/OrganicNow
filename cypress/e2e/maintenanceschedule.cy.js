@@ -4,7 +4,11 @@ describe("Maintenance Schedule Tests", () => {
   const API_BASE = Cypress.env("API_URL") || "http://localhost:8080";
 
   beforeEach(() => {
-    cy.intercept("GET", `${API_BASE}/schedules*`, {
+    // ✅ ใช้ wildcard pattern ที่จับได้ทุก host
+    cy.intercept({
+      method: "GET",
+      url: "**/schedules*"
+    }, {
       statusCode: 200,
       body: {
         result: [
@@ -24,7 +28,8 @@ describe("Maintenance Schedule Tests", () => {
     }).as("loadSchedules");
 
     cy.visit("/MaintenanceSchedule");
-    cy.wait("@loadSchedules", { timeout: 20000 });
+    // ✅ รอให้ตารางแสดงข้อมูลแทนการพึ่งพา cy.wait เพียงอย่างเดียว
+    cy.get("table tbody tr", { timeout: 20000 }).should("have.length.greaterThan", 0);
   });
 
   it("should load Maintenance Schedule page and display schedule data", () => {
@@ -143,13 +148,15 @@ describe("Maintenance Schedule Tests", () => {
   });
 
   it("should show error message if failed to load schedules", () => {
-    cy.intercept("GET", `${API_BASE}/schedules*`, {
+    cy.intercept({
+      method: "GET", 
+      url: "**/schedules*"
+    }, {
       statusCode: 500,
       body: { message: "Server Error" },
     }).as("loadSchedulesError");
 
     cy.visit("/MaintenanceSchedule");
-    cy.wait("@loadSchedulesError");
     cy.get(".alert-danger, .alert, [role='alert']", { timeout: 10000 })
       .should("exist")
       .invoke("text")

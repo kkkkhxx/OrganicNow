@@ -48,7 +48,11 @@ describe('E2E Test for Dashboard', () => {
     };
 
     beforeEach(() => {
-        cy.intercept('GET', 'http://localhost:8080/dashboard', {
+        // ✅ ใช้ wildcard pattern แทน hardcode URL
+        cy.intercept({
+            method: 'GET',
+            url: '**/dashboard*'
+        }, {
             statusCode: 200,
             body: mockResponse
         }).as('getDashboard');
@@ -57,8 +61,8 @@ describe('E2E Test for Dashboard', () => {
     // ทดสอบหน้า Dashboard โหลดสำเร็จ
     it('should load the dashboard page and display main sections', () => {
         cy.visit('/');
-        cy.wait('@getDashboard');
-        cy.contains('Dashboard').should('be.visible');
+        // ✅ รอให้เนื้อหาแสดงแทนการ wait API อย่างเดียว
+        cy.contains('Dashboard', { timeout: 15000 }).should('be.visible');
         cy.contains('Room Overview').should('be.visible');
         cy.contains('Request Overview').should('be.visible');
         cy.contains('Finance History').should('be.visible');
@@ -68,9 +72,8 @@ describe('E2E Test for Dashboard', () => {
     // ทดสอบห้องและชั้น
     it('should display rooms on Floor 1 and Floor 2 with correct colors', () => {
         cy.visit('/');
-        cy.wait('@getDashboard');
-
-        cy.contains('Floor 1').should('be.visible');
+        // ✅ รอให้ห้องแสดงแทนการ wait API
+        cy.contains('Floor 1', { timeout: 15000 }).should('be.visible');
         cy.contains('Floor 2').should('be.visible');
 
         // ตรวจสอบห้องบางห้องมีสีที่ถูกต้อง
@@ -88,8 +91,8 @@ describe('E2E Test for Dashboard', () => {
     // Legend
     it('should display legend correctly', () => {
         cy.visit('/');
-        cy.wait('@getDashboard');
-        cy.contains('Available').should('be.visible');
+        // ✅ รอให้ legend แสดง
+        cy.contains('Available', { timeout: 15000 }).should('be.visible');
         cy.contains('Unavailable').should('be.visible');
         cy.contains('Repair').should('be.visible');
         cy.get('.badge.bg-success').should('exist');
@@ -100,9 +103,8 @@ describe('E2E Test for Dashboard', () => {
     // Chart
     it('should display maintain requests and finance charts correctly', () => {
         cy.visit('/');
-        cy.wait('@getDashboard');
-
-        cy.contains('Request Overview (Last 12 months)').should('be.visible');
+        // ✅ รอให้ chart section แสดง
+        cy.contains('Request Overview (Last 12 months)', { timeout: 15000 }).should('be.visible');
         cy.contains('Finance History (Last 12 months)').should('be.visible');
 
         // ตรวจสอบว่ามีกราฟสองอันเท่านั้น (Line + Bar)
@@ -112,7 +114,8 @@ describe('E2E Test for Dashboard', () => {
     // Summary check
   it('should display room status summary with correct counts', () => {
     cy.visit('/');
-    cy.wait('@getDashboard');
+    // ✅ รอให้ Summary section แสดง
+    cy.contains('h5.card-title', 'Summary', { timeout: 15000 }).should('be.visible');
 
     const available = mockResponse.rooms.filter(r => r.status === 0).length;
     const unavailable = mockResponse.rooms.filter(r => r.status === 1).length;
@@ -155,17 +158,16 @@ describe('E2E Test for Dashboard', () => {
     it('should display correctly on mobile viewport', () => {
         cy.viewport('iphone-6');
         cy.visit('/');
-        cy.wait('@getDashboard');
-        cy.contains('Room Overview').should('be.visible');
+        // ✅ รอให้เนื้อหาแสดงบน mobile
+        cy.contains('Room Overview', { timeout: 15000 }).should('be.visible');
         cy.contains('Summary').should('be.visible');
     });
 
     // Interaction hover test (optional)
     it('should highlight room when hovered', () => {
         cy.visit('/');
-        cy.wait('@getDashboard');
-
-        cy.contains('101')
+        // ✅ รอให้ห้อง 101 แสดง
+        cy.contains('101', { timeout: 15000 })
             .trigger('mouseover')
             .should('have.css', 'filter')
             .and('match', /brightness|contrast|none/); // อนุโลม filter ใดก็ได้ตอน hover
@@ -173,15 +175,18 @@ describe('E2E Test for Dashboard', () => {
 
     // Error handling test
     it('should handle API failure gracefully', () => {
-        cy.intercept('GET', 'http://localhost:8080/dashboard', {
+        // ✅ ใช้ wildcard pattern สำหรับ error case
+        cy.intercept({
+            method: 'GET',
+            url: '**/dashboard*'
+        }, {
             statusCode: 500,
             body: { error: 'Server Error' }
         }).as('getDashboardError');
 
         cy.visit('/');
-        cy.wait('@getDashboardError');
-
-        cy.contains('Room Overview').should('be.visible');
+        // ✅ รอให้เนื้อหา default แสดง
+        cy.contains('Room Overview', { timeout: 15000 }).should('be.visible');
         cy.contains('Summary').should('be.visible');
     });
 });

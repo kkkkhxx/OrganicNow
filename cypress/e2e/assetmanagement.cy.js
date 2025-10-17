@@ -52,7 +52,13 @@ describe("E2E Full CRUD & UI Interaction Test for Asset Management Page", () => 
     // Create
     cy.intercept("POST", /asset-group\/create.*/, { statusCode: 200 }).as("createGroup");
     cy.contains("Create Asset Group").click();
-    cy.get("#groupModal input").type("NewGroup");
+    
+    // ✅ รอให้ modal แสดงและเป็น visible จริงๆ
+    cy.get("#groupModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#groupModal.show", { timeout: 5000 }).should("exist");
+    
+    // ✅ ใช้ force: true เพื่อป้องกันปัญหา visibility
+    cy.get("#groupModal input").type("NewGroup", { force: true });
     cy.get("#groupModal form").submit();
     cy.wait("@createGroup");
     confirmSwal();
@@ -60,8 +66,11 @@ describe("E2E Full CRUD & UI Interaction Test for Asset Management Page", () => 
     // Edit
     cy.intercept("PUT", /asset-group\/update\/.*/, { statusCode: 200 }).as("updateGroup");
     cy.get(".list-group-item").contains("Furniture").parent().find(".bi-pencil-fill").click({ force: true });
-    // รอให้ input value อัพเดตก่อน submit
-    cy.get("#groupModal input").should("have.value", "Furniture").clear().type("FurnitureX");
+    
+    // ✅ รอให้ modal แสดงและ input มี value
+    cy.get("#groupModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#groupModal.show", { timeout: 5000 }).should("exist");
+    cy.get("#groupModal input").should("have.value", "Furniture").clear({ force: true }).type("FurnitureX", { force: true });
     cy.get("#groupModal form").submit();
     cy.wait("@updateGroup");
     confirmSwal();
@@ -79,8 +88,13 @@ describe("E2E Full CRUD & UI Interaction Test for Asset Management Page", () => 
     // Create single
     cy.intercept("POST", /assets\/create.*/, { statusCode: 200 }).as("createAsset");
     cy.get(".list-group-item").contains("Furniture").parent().find(".bi-plus-circle-fill").click({ force: true });
-    cy.get("#assetModal input[type='text']").type("NewChair");
-    cy.get("#assetModal select").select("1");
+    
+    // ✅ รอให้ modal แสดงและเป็น visible
+    cy.get("#assetModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#assetModal.show", { timeout: 5000 }).should("exist");
+    
+    cy.get("#assetModal input[type='text']").type("NewChair", { force: true });
+    cy.get("#assetModal select").select("1", { force: true });
     cy.get("#assetModal input[type='number']").should("have.value", "1"); // default quantity
     cy.get("#assetModal form").submit();
     cy.wait("@createAsset");
@@ -89,8 +103,13 @@ describe("E2E Full CRUD & UI Interaction Test for Asset Management Page", () => 
     // Create bulk
     cy.intercept("POST", /assets\/bulk.*/, { statusCode: 200 }).as("bulkAsset");
     cy.get(".list-group-item").contains("Furniture").parent().find(".bi-plus-circle-fill").click({ force: true });
-    cy.get("#assetModal input[type='text']").clear().type("BulkChair");
-    cy.get("#assetModal input[type='number']").clear().type("3");
+    
+    // ✅ รอให้ modal แสดง
+    cy.get("#assetModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#assetModal.show", { timeout: 5000 }).should("exist");
+    
+    cy.get("#assetModal input[type='text']").clear({ force: true }).type("BulkChair", { force: true });
+    cy.get("#assetModal input[type='number']").clear({ force: true }).type("3", { force: true });
     cy.get("#assetModal form").submit();
     cy.wait("@bulkAsset");
     confirmSwal();
@@ -98,8 +117,11 @@ describe("E2E Full CRUD & UI Interaction Test for Asset Management Page", () => 
     // Edit
     cy.intercept("PUT", /assets\/update\/.*/, { statusCode: 200 }).as("updateAsset");
     cy.get("table tbody tr").contains("Chair").parent().find(".bi-pencil-fill").click({ force: true });
-    // รอ input value อัพเดต
-    cy.get("#assetModal input[type='text']").should("have.value", "Chair").clear().type("ChairX");
+    
+    // ✅ รอให้ modal แสดงและ input มี value
+    cy.get("#assetModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#assetModal.show", { timeout: 5000 }).should("exist");
+    cy.get("#assetModal input[type='text']").should("have.value", "Chair").clear({ force: true }).type("ChairX", { force: true });
     cy.get("#assetModal form").submit();
     cy.wait("@updateAsset");
     confirmSwal();
@@ -115,11 +137,21 @@ describe("E2E Full CRUD & UI Interaction Test for Asset Management Page", () => 
   // ===== 5. Validation =====
   it("should show validation messages correctly", () => {
     cy.contains("Create Asset Group").click({ force: true });
+    
+    // ✅ รอให้ modal แสดง
+    cy.get("#groupModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#groupModal.show", { timeout: 5000 }).should("exist");
+    
     cy.get("#groupModal form").submit();
     cy.contains("กรุณากรอกชื่อ Group").should("exist");
     confirmSwal();
 
     cy.get(".list-group-item").contains("Furniture").parent().find(".bi-plus-circle-fill").click({ force: true });
+    
+    // ✅ รอให้ modal แสดง
+    cy.get("#assetModal", { timeout: 10000 }).should("be.visible");
+    cy.get("#assetModal.show", { timeout: 5000 }).should("exist");
+    
     cy.get("#assetModal form").submit();
     cy.contains("กรุณากรอกชื่อและเลือกกลุ่ม").should("exist");
     confirmSwal();

@@ -124,7 +124,7 @@ describe("E2E Full CRUD & UI Interaction Test for Maintenance Details", () => {
   // ✅ TEST 5: Delete ทำงานสำเร็จ
   it("should confirm and delete maintenance record successfully", () => {
     cy.window().then((win) =>
-      win.fetch(`http://localhost:8080/maintain/${ID}`, { method: "DELETE" })
+      win.fetch(`**/maintain/${ID}`, { method: "DELETE" })
         .then((res) => expect(res.status).to.eq(200))
     );
   });

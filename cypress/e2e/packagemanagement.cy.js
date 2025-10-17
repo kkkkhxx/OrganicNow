@@ -189,7 +189,7 @@ it("should toggle active switch and call API (UI verified)", () => {
     cy.wait(200);
     cy.request({
       method: "DELETE",
-      url: "http://localhost:8080/packages/1",
+      url: "**/packages/1",
       failOnStatusCode: false,
     }).then((resp) => {
       expect(resp.status).to.be.oneOf([200, 204, 404]); // safe fallback
