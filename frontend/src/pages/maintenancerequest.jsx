@@ -5,11 +5,13 @@ import Modal from "../component/modal";
 import Pagination from "../component/pagination";
 import { useToast } from "../component/Toast.jsx";
 import { pageSize as defaultPageSize } from "../config_variable";
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import * as bootstrap from "bootstrap"; // <-- ใช้ตัวนี้สำหรับควบคุมโมดัลแบบโปรแกรม
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 
-const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080";
+// const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080"; // เก่า
+const API_BASE = API_BASE_URL; // ใช้ config ใหม่
 
 // ===== map helpers =====
 const ISSUE_MAP = {

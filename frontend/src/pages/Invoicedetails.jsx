@@ -7,8 +7,10 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import * as bootstrap from "bootstrap";
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 
-const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080";
+// const API_BASE = import.meta.env?.VITE_API_URL ?? "http://localhost:8080"; // เก่า
+const API_BASE = API_BASE_URL; // ใช้ config ใหม่
 
 function InvoiceDetails() {
   const navigate = useNavigate();

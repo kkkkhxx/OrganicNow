@@ -4,7 +4,9 @@ import axios from "axios";
 import Layout from "../component/layout";
 import Pagination from "../component/pagination";
 import { useToast } from "../component/Toast.jsx";
-import { pageSize as defaultPageSize, apiPath } from "../config_variable";
+import { pageSize as defaultPageSize } from "../config_variable";
+// import { pageSize as defaultPageSize, apiPath } from "../config_variable"; // เก่า
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import "../assets/css/roommanagement.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -23,7 +25,8 @@ function RoomManagement() {
   // ✅ โหลดข้อมูลห้องจาก backend
   const fetchRooms = async () => {
     try {
-      const res = await axios.get(`${apiPath}/room/list`, {
+      const res = await axios.get(`${API_BASE_URL}/room/list`, {
+      // const res = await axios.get(`${apiPath}/room/list`, { // เก่า
         withCredentials: true,
       });
       if (Array.isArray(res.data)) {

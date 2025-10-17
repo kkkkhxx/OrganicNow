@@ -4,7 +4,9 @@ import Layout from "../component/layout";
 import Modal from "../component/modal";
 import Pagination from "../component/pagination";
 import useMessage from "../component/useMessage";
-import { pageSize as defaultPageSize, apiPath } from "../config_variable";
+import { pageSize as defaultPageSize } from "../config_variable";
+// import { pageSize as defaultPageSize, apiPath } from "../config_variable"; // เก่า
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -51,7 +53,8 @@ function AssetManagement() {
   // ========= Fetch Asset Groups =========
   const fetchGroups = async () => {
     try {
-      const res = await axios.get(`${apiPath}/asset-group/list`, {
+      const res = await axios.get(`${API_BASE_URL}/asset-group/list`, {
+      // const res = await axios.get(`${apiPath}/asset-group/list`, { // เก่า
         withCredentials: true,
       });
       if (Array.isArray(res.data)) setAssetGroups(res.data);
@@ -65,7 +68,8 @@ function AssetManagement() {
   // ========= Fetch Assets =========
   const fetchData = async (page = 1) => {
     try {
-      const res = await axios.get(`${apiPath}/assets/all`, {
+      const res = await axios.get(`${API_BASE_URL}/assets/all`, {
+      // const res = await axios.get(`${apiPath}/assets/all`, { // เก่า
         withCredentials: true,
       });
 
@@ -217,14 +221,16 @@ function AssetManagement() {
       setSaving(true);
       if (editingGroupId == null) {
         await axios.post(
-          `${apiPath}/asset-group/create`,
+          `${API_BASE_URL}/asset-group/create`,
+          // `${apiPath}/asset-group/create`, // เก่า
           { assetGroupName: groupName },
           { withCredentials: true }
         );
         showMessageSave("สร้าง Group สำเร็จ");
       } else {
         await axios.put(
-          `${apiPath}/asset-group/update/${editingGroupId}`,
+          `${API_BASE_URL}/asset-group/update/${editingGroupId}`,
+          // `${apiPath}/asset-group/update/${editingGroupId}`, // เก่า
           { assetGroupName: groupName },
           { withCredentials: true }
         );
@@ -259,7 +265,7 @@ function AssetManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`${apiPath}/asset-group/delete/${g.id}`, {
+      await axios.delete(`\/asset-group/delete/${g.id}`, {
         withCredentials: true,
       });
 
@@ -287,7 +293,7 @@ function AssetManagement() {
 
       // ✅ ถ้ามีการกรอก quantity และมากกว่า 1 → ใช้ bulk
       if (editingAssetId == null && parseInt(formQty) > 1) {
-        await axios.post(`${apiPath}/assets/bulk`, null, {
+        await axios.post(`\/assets/bulk`, null, {
           params: {
             assetGroupId: parseInt(formGroupId),
             name: formName.trim(),
@@ -299,7 +305,7 @@ function AssetManagement() {
       } 
       // ✅ ถ้าจำนวน = 1 → ใช้ create เดิม
       else if (editingAssetId == null) {
-        await axios.post(`${apiPath}/assets/create`, {
+        await axios.post(`\/assets/create`, {
           assetName: formName.trim(),
           assetGroup: { id: parseInt(formGroupId) },
         }, { withCredentials: true });
@@ -307,7 +313,7 @@ function AssetManagement() {
       } 
       // ✅ ถ้าเป็นการแก้ไข
       else {
-        await axios.put(`${apiPath}/assets/update/${editingAssetId}`, {
+        await axios.put(`\/assets/update/${editingAssetId}`, {
           assetName: formName.trim(),
           assetGroup: { id: parseInt(formGroupId) },
         }, { withCredentials: true });
@@ -330,7 +336,7 @@ function AssetManagement() {
     if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`${apiPath}/assets/delete/${row.assetId}`, {
+      await axios.delete(`\/assets/delete/${row.assetId}`, {
         withCredentials: true,
       });
       fetchData(currentPage);

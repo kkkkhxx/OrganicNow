@@ -13,6 +13,7 @@ import {
 } from "chart.js";
 
 import Layout from "../component/layout";
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -34,7 +35,10 @@ function Dashboard() {
 
     // 👉 ดึงข้อมูลจาก backend
     useEffect(() => {
-        fetch("http://localhost:8080/dashboard")
+        fetch(`${API_BASE_URL}/dashboard`, {
+            credentials: 'include'
+        })
+        // fetch("http://localhost:8080/dashboard") // เก่า
             .then((res) => res.json())
             .then((data) => {
                 console.log("📊 Dashboard API:", data);

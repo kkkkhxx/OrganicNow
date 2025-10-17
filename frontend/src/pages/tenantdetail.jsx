@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import Layout from "../component/layout";
 import Modal from "../component/modal";
-import { apiPath } from "../config_variable";
+// import { apiPath } from "../config_variable"; // เก่า
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import "../assets/css/tenantmanagement.css";
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap/dist/css/bootstrap.min.css";
@@ -43,7 +44,8 @@ function TenantDetail() {
 
   const fetchTenantDetail = async () => {
     try {
-      const res = await axios.get(`${apiPath}/tenant/${contractId}`, {
+      const res = await axios.get(`${API_BASE_URL}/tenant/${contractId}`, {
+      // const res = await axios.get(`${apiPath}/tenant/${contractId}`, { // เก่า
         withCredentials: true,
       });
       setTenant(res.data);
@@ -138,7 +140,8 @@ function TenantDetail() {
 
     try {
       const res = await axios.put(
-        `${apiPath}/tenant/update/${contractId}`,
+        `${API_BASE_URL}/tenant/update/${contractId}`,
+        // `${apiPath}/tenant/update/${contractId}`, // เก่า
         payload,
         { withCredentials: true }
       );

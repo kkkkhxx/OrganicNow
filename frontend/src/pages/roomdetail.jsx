@@ -5,6 +5,7 @@ import Modal from "../component/modal";
 import axios from "axios";
 import "../assets/css/roomdetail.css";
 import useMessage from "../component/useMessage";
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 
 function RoomDetail() {
   const { roomId: id } = useParams(); // เอา roomId มา rename เป็น id  const navigate = useNavigate();
@@ -21,13 +22,16 @@ function RoomDetail() {
     const fetchRoomDetail = async () => {
       try {
         const [roomRes, assetRes, groupRes] = await Promise.all([
-          axios.get(`http://localhost:8080/room/${id}/detail`, {
+          axios.get(`${API_BASE_URL}/room/${id}/detail`, {
+          // axios.get(`http://localhost:8080/room/${id}/detail`, { // เก่า
             withCredentials: true,
           }),
-          axios.get("http://localhost:8080/assets/all", {
+          axios.get(`${API_BASE_URL}/assets/all`, {
+          // axios.get("http://localhost:8080/assets/all", { // เก่า
             withCredentials: true,
           }),
-          axios.get("http://localhost:8080/asset-group/list", {
+          axios.get(`${API_BASE_URL}/asset-group/list`, {
+          // axios.get("http://localhost:8080/asset-group/list", { // เก่า
             withCredentials: true,
           }),
         ]);
@@ -43,7 +47,8 @@ function RoomDetail() {
 
         // Get all assets already used in other rooms
         const allUsedAssetIds = new Set(); // to store assets used in any room
-        const roomsRes = await axios.get("http://localhost:8080/room", {
+        const roomsRes = await axios.get(`${API_BASE_URL}/room`, {
+        // const roomsRes = await axios.get("http://localhost:8080/room", { // เก่า
           withCredentials: true,
         });
         roomsRes.data.forEach((room) => {
@@ -356,14 +361,16 @@ function RoomDetail() {
 
               // Send the selected asset IDs to the server
               await axios.put(
-                `http://localhost:8080/room/${id}/assets`,
+                `${API_BASE_URL}/room/${id}/assets`,
+                // `http://localhost:8080/room/${id}/assets`, // เก่า
                 selectedIds,
                 { withCredentials: true }
               );
 
               // Update room information
               await axios.put(
-                `http://localhost:8080/room/${id}`,
+                `${API_BASE_URL}/room/${id}`,
+                // `http://localhost:8080/room/${id}`, // เก่า
                 {
                   roomFloor: form.roomFloor,
                   roomNumber: form.roomNumber,
@@ -374,7 +381,8 @@ function RoomDetail() {
 
               // Refresh room data
               const refreshed = await axios.get(
-                `http://localhost:8080/room/${id}/detail`,
+                `${API_BASE_URL}/room/${id}/detail`,
+                // `http://localhost:8080/room/${id}/detail`, // เก่า
                 { withCredentials: true }
               );
               setRoomData(refreshed.data);

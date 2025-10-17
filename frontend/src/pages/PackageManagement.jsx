@@ -3,13 +3,15 @@ import Layout from "../component/layout";
 import Modal from "../component/modal";
 import Pagination from "../component/pagination";
 import { pageSize as defaultPageSize } from "../config_variable";
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import * as bootstrap from "bootstrap";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import useMessage from "../component/useMessage";
 
 /* ========= API via fetch ========= */
-const API_BASE = import.meta.env?.VITE_API_URL || "http://localhost:8080";
+// const API_BASE = import.meta.env?.VITE_API_URL || "http://localhost:8080"; // เก่า
+const API_BASE = API_BASE_URL; // ใช้ config ใหม่
 
 async function getJSON(url, opts = {}) {
   const res = await fetch(url, {

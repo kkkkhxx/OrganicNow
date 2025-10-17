@@ -6,7 +6,9 @@ import Modal from "../component/modal";
 import useMessage from "../component/useMessage"; 
 import { useToast } from "../component/Toast.jsx";
 import Pagination from "../component/pagination";
-import { pageSize as defaultPageSize, apiPath } from "../config_variable";
+import { pageSize as defaultPageSize } from "../config_variable";
+// import { pageSize as defaultPageSize, apiPath } from "../config_variable"; // เก่า
+import { API_BASE_URL } from "../config/api.js"; // ใหม่
 import "../assets/css/tenantmanagement.css";
 import "../assets/css/alert.css"; 
 import "bootstrap/dist/js/bootstrap.bundle.min.js";
@@ -66,7 +68,8 @@ function TenantManagement() {
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        const res = await axios.get(`${apiPath}/packages`, {
+        const res = await axios.get(`${API_BASE_URL}/packages`, {
+        // const res = await axios.get(`${apiPath}/packages`, { // เก่า
           withCredentials: true,
         });
 
@@ -113,7 +116,8 @@ function TenantManagement() {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const res = await axios.get(`${apiPath}/room/list`, {
+        const res = await axios.get(`${API_BASE_URL}/room/list`, {
+        // const res = await axios.get(`${apiPath}/room/list`, { // เก่า
           withCredentials: true,
         });
         if (Array.isArray(res.data)) {
@@ -146,7 +150,8 @@ function TenantManagement() {
 
   const fetchData = async (page = 1) => {
     try {
-      const res = await axios.get(`${apiPath}/tenant/list`, {
+      const res = await axios.get(`${API_BASE_URL}/tenant/list`, {
+      // const res = await axios.get(`${apiPath}/tenant/list`, { // เก่า
         withCredentials: true,
         params: { page, pageSize },
       });
@@ -227,7 +232,8 @@ function TenantManagement() {
 
       if (checkValidation(payload) === false) return false;
 
-      const res = await axios.post(`${apiPath}/tenant/create`, payload, {
+      const res = await axios.post(`${API_BASE_URL}/tenant/create`, payload, {
+      // const res = await axios.post(`${apiPath}/tenant/create`, payload, { // เก่า
         withCredentials: true,
       });
 
@@ -341,7 +347,8 @@ function TenantManagement() {
     }
 
     try {
-      const res = await axios.delete(`${apiPath}/tenant/delete/${contractId}`, {
+      const res = await axios.delete(`${API_BASE_URL}/tenant/delete/${contractId}`, {
+      // const res = await axios.delete(`${apiPath}/tenant/delete/${contractId}`, { // เก่า
         withCredentials: true,
       });
 
@@ -405,7 +412,8 @@ function TenantManagement() {
 
   const fetchOccupiedRooms = async () => {
     try {
-      const res = await axios.get(`${apiPath}/contracts/occupied-rooms`, {
+      const res = await axios.get(`${API_BASE_URL}/contracts/occupied-rooms`, {
+      // const res = await axios.get(`${apiPath}/contracts/occupied-rooms`, { // เก่า
         withCredentials: true,
       });
       if (Array.isArray(res.data)) {
@@ -428,7 +436,8 @@ function TenantManagement() {
   };
 
   const handleDownloadPdf = async (contractId) => {
-    const res = await axios.get(`${apiPath}/tenant/${contractId}/pdf`, {
+    const res = await axios.get(`${API_BASE_URL}/tenant/${contractId}/pdf`, {
+    // const res = await axios.get(`${apiPath}/tenant/${contractId}/pdf`, { // เก่า
       responseType: "blob",
       withCredentials: true,
     });
