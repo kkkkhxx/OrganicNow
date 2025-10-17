@@ -2,7 +2,7 @@ name: CI - Frontend & Backend Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, demo/cicd-setup]
   pull_request:
     branches: [main]
 
