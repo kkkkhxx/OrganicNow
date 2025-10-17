@@ -285,8 +285,8 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}
 
-      - name: Also tag :latest when on main
-        if: github.ref == 'refs/heads/main'
+      - name: Also tag :latest when on main or demo
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/demo/cicd-setup'
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -324,8 +324,8 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG_SHA }}
 
-      - name: Also tag :latest when on main
-        if: github.ref == 'refs/heads/main'
+      - name: Also tag :latest when on main or demo
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/demo/cicd-setup'
         uses: docker/build-push-action@v5
         with:
           context: ./backend
