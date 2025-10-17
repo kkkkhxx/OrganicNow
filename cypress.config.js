@@ -1,50 +1,42 @@
+// root/cypress.config.js
 const { defineConfig } = require("cypress");
 const path = require("path");
-const fs = require("fs");
+const Module = require("module");
 
-// ✅ สร้าง symlink ชี้ vite จาก frontend → root (เพื่อให้ Cypress หาเจอ)
-const frontendVitePath = path.resolve(__dirname, "frontend/node_modules/vite");
-const rootViteFakePath = path.resolve(__dirname, "node_modules/vite");
-
-if (!fs.existsSync(rootViteFakePath)) {
-  try {
-    fs.mkdirSync(path.dirname(rootViteFakePath), { recursive: true });
-    fs.symlinkSync(frontendVitePath, rootViteFakePath, "junction");
-    console.log("✅ Linked vite from frontend -> root/node_modules/vite");
-  } catch (e) {
-    console.warn("⚠️ Failed to link vite:", e.message);
-  }
-}
+// helper: require โมดูลจาก frontend/node_modules
+const requireFromFrontend = (mod) => {
+    const frontendRoot = path.resolve(__dirname, "frontend");
+    return Module.createRequire(path.join(frontendRoot, "vite.config.js"))(mod);
+};
 
 module.exports = defineConfig({
-  e2e: {
-    baseUrl: "http://localhost:5173",
-    specPattern: "cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
-    testIsolation: false,
-       chromeWebSecurity: false,
-  },
+    video: false,
+    retries: { runMode: 1, openMode: 0 },
 
-  component: {
-    devServer: {
-      framework: "react",
-      bundler: "vite",
-      viteConfig: require(path.resolve(__dirname, "frontend/vite.config.js")),
+    e2e: {
+        baseUrl: process.env.CYPRESS_BASE_URL || "http://localhost:5173",
+        specPattern: [
+            "cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
+            "frontend/cypress/e2e/**/*.cy.{js,jsx,ts,tsx}"
+        ],
+        testIsolation: false,
+        chromeWebSecurity: false,
+        setupNodeEvents(on, config) {
+            // 👉 ถ้ารัน CT ค่อยโหลด vite ตอนนี้ (CI ที่รัน E2E จะไม่เข้าบล็อกนี้)
+            if (config.testingType === "component") {
+                const viteConfig = requireFromFrontend("./frontend/vite.config.js");
+                config.component = {
+                    devServer: {
+                        framework: "react",
+                        bundler: "vite",
+                        viteConfig,
+                    },
+                    specPattern: "cypress/component/**/*.cy.{js,jsx,ts,tsx}",
+                    supportFile: false,
+                };
+            }
+            return config;
+        },
     },
-    specPattern: "cypress/{e2e,component}/**/*.cy.{js,jsx,ts,tsx}",
-    supportFile: false, // ❌ ไม่ต้องมี support file
-  },
-
-  projectId: "5zi2ou",
-
-  setupNodeEvents(on, config) {
-    // ✅ แก้ปัญหา path Windows: ให้ Cypress อนุญาต path ที่เป็น C:/Users/...
-    process.env.CYPRESS_INTERNAL_VITE_FS_ALLOW = "C:/Users";
-
-    // ✅ เปลี่ยน working dir ให้ Cypress ทำงานใน frontend
-    const frontendDir = path.resolve(__dirname, "frontend");
-    process.chdir(frontendDir);
-    console.log("👉 Changed working directory to:", frontendDir);
-
-    return config;
-  },
 });
+
