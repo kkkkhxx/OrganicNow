@@ -164,7 +164,7 @@ jobs:
 
       - name: docker compose up (build & run)
         run: |
-          docker compose -f "${COMPOSE_FILE}" -f ci-db-override.yml up -d --build
+          docker compose -f "${COMPOSE_FILE}" up -d --build
           docker ps
 
       - name: Wait for backend to be healthy
