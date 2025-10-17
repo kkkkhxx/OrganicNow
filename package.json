@@ -5,6 +5,8 @@
   "devDependencies": {
     "cypress": "^15.4.0",
     "cypress-wait-until": "^3.0.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "start-server-and-test": "^2.1.2",
     "wait-on": "^9.0.1"
   },

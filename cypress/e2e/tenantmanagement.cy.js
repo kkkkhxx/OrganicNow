@@ -7,7 +7,6 @@ describe("E2E Full CRUD & UI Interaction Test for Tenant Management", () => {
   const startStr = fmt(tomorrow); // ใช้วันพรุ่งนี้ให้ผ่าน validation
 
   beforeEach(() => {
-    // Mock APIs
     cy.intercept("GET", "**/packages*", {
       statusCode: 200,
       body: [
@@ -16,13 +15,14 @@ describe("E2E Full CRUD & UI Interaction Test for Tenant Management", () => {
       ],
     }).as("getPackages");
 
-    cy.intercept("GET", "**/rooms*", {
+    // ✅ แก้ตรงนี้ จาก **/rooms* → **/room/list*
+    cy.intercept("GET", "**/room/list*", {
       statusCode: 200,
       body: [
         { roomId: 1, roomNumber: "101", roomFloor: 1 },
         { roomId: 2, roomNumber: "102", roomFloor: 1 },
       ],
-    }).as("getRooms");
+    }).as("getRoomList"); // ✅ เปลี่ยนชื่อ alias ให้ชัด
 
     cy.intercept("GET", "**/tenant/list*", {
       statusCode: 200,
@@ -69,8 +69,11 @@ describe("E2E Full CRUD & UI Interaction Test for Tenant Management", () => {
     }).as("deleteTenant");
 
     cy.visit("/tenantmanagement");
-    cy.wait(["@getPackages", "@getRooms", "@getTenantList"], { timeout: 10000 });
+
+    // ✅ เปลี่ยนรอให้ตรงกับ alias ใหม่
+    cy.wait(["@getPackages", "@getRoomList", "@getTenantList"], { timeout: 10000 });
   });
+
 
   it("should load tenant management page and show main toolbar", () => {
     cy.contains("Tenant Management").should("be.visible");
@@ -226,7 +229,8 @@ describe("E2E Full CRUD & UI Interaction Test for Tenant Management", () => {
   it("should render correctly on mobile viewport", () => {
     cy.viewport("iphone-6");
     cy.visit("/tenantmanagement");
-    cy.wait(["@getPackages", "@getRooms", "@getTenantList"], { timeout: 10000 });
+    cy.wait(["@getPackages", "@getRoomList", "@getTenantList"], { timeout: 10000 });
     cy.contains("Tenant Management").should("be.visible");
   });
+
 });

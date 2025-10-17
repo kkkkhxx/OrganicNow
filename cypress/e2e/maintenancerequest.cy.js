@@ -126,64 +126,78 @@ it("should create new maintenance request successfully", () => {
   }).as("createRequest");
 
   cy.visit("/maintenancerequest");
-  cy.wait(1000);
+  cy.wait(500);
 
-  cy.get('button.btn-primary').contains('Create Request').click();
-  cy.get('#requestModal').should('be.visible');
+  cy.contains("button", "Create Request").click();
+  cy.get("#requestModal").should("be.visible");
 
-  // ✅ กรอกข้อมูลให้ครบตาม logic isFormValid
-  cy.get('input[name="room"]').type("205");
-  cy.get('select[name="target"]').select("Asset");
-  cy.get('select[name="issue"]').select("Air conditioner");
-  cy.get('input[name="requestDate"]').type("2025-10-20");
+  cy.get("#requestModal").within(() => {
+    // Floor: ใช้ cy.select ได้ เพราะค่า "1" ไม่น่าซ้ำ
+    cy.contains("label", "Floor").parent().find("select").select("1", { force: true });
 
-  // ✅ รอให้ React update state ก่อนกด
-  cy.wait(200);
-  cy.get('button.btn-primary').contains("Save").should("not.be.disabled").click();
+    // Room: หาค่า option ตัวแรกที่ไม่ว่าง แล้วตั้งค่า value โดยตรง (ไม่ใช้ cy.select)
+    cy.contains("label", "Room").parent().find("select").as("roomSel");
+
+    // รอจนกว่าจะมี option พร้อมให้เลือก
+    cy.get("@roomSel").find("option").not('[value=""]').should("have.length.greaterThan", 0);
+
+    cy.get("@roomSel").find("option").not('[value=""]').eq(0).then($opt => {
+      const val = $opt.attr("value");
+      cy.get("@roomSel").invoke("val", val).trigger("change");
+    });
+
+    cy.get('select[name="target"]').select("Asset", { force: true });
+    cy.get('select[name="issue"]').select("Air conditioner", { force: true });
+    cy.get('input[name="requestDate"]').type("2025-10-20", { force: true });
+
+    cy.get('button.btn-primary').contains("Save")
+      .should("not.be.disabled")
+      .click({ force: true });
+  });
 
   cy.wait("@createRequest").its("response.statusCode").should("eq", 200);
-  cy.get('#requestModal', { timeout: 8000 }).should('not.have.class', 'show');
+  cy.get("#requestModal", { timeout: 8000 }).should("not.have.class", "show");
 });
 
+it("should not create request when Cancel button clicked", () => {
+  cy.contains("button", "Create Request").click({ force: true });
+  cy.get("#requestModal").should("be.visible");
 
- it("should not create request when Cancel button clicked", () => {
-   cy.get('button[data-bs-target="#requestModal"]').click({ force: true });
-   cy.get("#requestModal").should("be.visible");
+  // ✅ เลือก floor และ room ตามฟอร์มจริง
+  cy.get('#requestModal select').first().select("1");
+  cy.get('#requestModal select').eq(1).select("101");
 
-   cy.get('input[name="room"]').type("999");
+  // ✅ คลิกปุ่ม Cancel
+  cy.get('#requestModal button[data-bs-dismiss="modal"]').first().click({ force: true });
 
-   // คลิกปุ่ม Cancel
-   cy.get('#requestModal button[data-bs-dismiss="modal"]').first().click({ force: true });
+  // ✅ Force hide (กัน fade transition ค้าง)
+  cy.window().then((win) => {
+    const modal = win.document.getElementById("requestModal");
+    if (modal && modal.classList.contains("show")) {
+      const inst = win.bootstrap?.Modal?.getInstance(modal);
+      if (inst) inst.hide();
+      modal.classList.remove("show");
+      modal.style.display = "none";
+      modal.setAttribute("aria-hidden", "true");
+    }
+  });
 
-   // ✅ Force hide (เผื่อ transition fade ยังไม่จบ)
-   cy.window().then((win) => {
-     const modal = win.document.getElementById("requestModal");
-     if (modal && modal.classList.contains("show")) {
-       const inst = win.bootstrap?.Modal?.getInstance(modal);
-       if (inst) inst.hide();
-       modal.classList.remove("show");
-       modal.style.display = "none";
-       modal.setAttribute("aria-hidden", "true");
-     }
-   });
+  // ✅ รอ modal ปิดจริง
+  cy.waitUntil(
+    () =>
+      cy.document().then((doc) => {
+        const el = doc.querySelector("#requestModal");
+        if (!el) return true;
+        return (
+          el.getAttribute("aria-hidden") === "true" ||
+          window.getComputedStyle(el).display === "none"
+        );
+      }),
+    { timeout: 10000, interval: 400, errorMsg: "Modal did not close after Cancel" }
+  );
 
-   // ✅ รอ modal ปิดจริง (เช็ก aria-hidden หรือ display)
-   cy.waitUntil(
-     () =>
-       cy.document().then((doc) => {
-         const el = doc.querySelector("#requestModal");
-         if (!el) return true;
-         return (
-           el.getAttribute("aria-hidden") === "true" ||
-           window.getComputedStyle(el).display === "none"
-         );
-       }),
-     { timeout: 10000, interval: 400, errorMsg: "Modal did not close after Cancel" }
-   );
-
-   cy.get("#requestModal").should("not.be.visible");
- });
-
+  cy.get("#requestModal").should("not.be.visible");
+});
 
   it("should delete maintenance request successfully", () => {
     cy.window().then((win) => {
