@@ -171,12 +171,22 @@ jobs:
 
       - name: Wait for frontend to be up
         run: |
-          for i in {1..60}; do
-            curl -fsS "$HEALTH_URL_FRONTEND" && exit 0
-            echo "Waiting for frontend... ($i/60)"
-            sleep 2
+          set -euo pipefail
+          for i in {1..120}; do
+            # เช็คว่า frontend container รันอยู่และ port 5173 เปิดแล้ว
+            if curl -fsS "$HEALTH_URL_FRONTEND" >/dev/null 2>&1; then
+              echo "Frontend is up ✅"
+              exit 0
+            fi
+            echo "Waiting for frontend... ($i/120)"
+            sleep 3
           done
-          echo "Frontend not up in time"; docker ps; exit 1
+          echo "Frontend not up in time ❌"
+          echo "Container status:"
+          docker ps
+          echo "Frontend logs:"
+          docker compose -f "${COMPOSE_FILE}" logs frontend || true
+          exit 1
 
       # ----------------------------
       # ✅ Run Integration Tests บน network เดียวกับ compose
@@ -245,7 +255,7 @@ jobs:
         run: docker compose -f "${{ env.COMPOSE_FILE }}" down -v
 
   docker-push-frontend:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/demo/cicd-setup')
     name: Build & Push Frontend Image
     runs-on: ubuntu-latest
     needs: [backend, e2e]
@@ -284,7 +294,7 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.TAG_LATEST }}
 
   docker-push-backend:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/demo/cicd-setup')
     name: Build & Push Backend Image
     runs-on: ubuntu-latest
     needs: [backend, e2e]
