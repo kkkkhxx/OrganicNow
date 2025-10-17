@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "roomNumber": "101",
+    "roomFloor": 1,
+    "targetType": 0,
+    "issueTitle": "Light flickering",
+    "issueCategory": 1,
+    "createDate": "2025-10-01T00:00:00",
+    "scheduledDate": "2025-10-03T00:00:00",
+    "finishDate": null
+  },
+  {
+    "id": 2,
+    "roomNumber": "205",
+    "roomFloor": 2,
+    "targetType": 1,
+    "issueTitle": "Wall crack",
+    "issueCategory": 0,
+    "createDate": "2025-09-28T00:00:00",
+    "scheduledDate": null,
+    "finishDate": "2025-10-10T00:00:00"
+  }
+]

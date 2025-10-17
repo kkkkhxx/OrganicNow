@@ -4,41 +4,27 @@ describe("E2E Full CRUD & UI Interaction Test for Maintenance Details", () => {
   const ID = 1;
 
   beforeEach(() => {
-    // ✅ intercept mock API (GET, PUT, DELETE)
-    cy.intercept("GET", /\/maintain\/\d+$/, (req) => {
-      req.reply({
-        statusCode: 200,
-        body: {
-          id: ID,
-          roomNumber: "205",
-          roomFloor: 2,
-          targetType: 1,
-          issueTitle: "Water leakage",
-          issueCategory: "Plumbing",
-          issueDescription: "Pipe leaking near the sink",
-          createDate: "2025-10-01T00:00:00",
-          scheduledDate: "2025-10-05T00:00:00",
-          finishDate: null,
-        },
-      });
-    }).as("getInitial");
-
-    cy.intercept("PUT", "**/maintain/update/**", (req) => {
-      req.reply({ statusCode: 200, body: { success: true } });
+    // ✅ ลง intercepts ก่อน visit เสมอ
+    cy.intercept("GET", /\/maintain\/\d+$/, { fixture: 'maintenances/detail-1.json' }).as("getMaintenanceDetail");
+    cy.intercept("PUT", "**/maintain/update/**", { 
+      statusCode: 200, 
+      body: { success: true, message: "Updated successfully" } 
     }).as("putUpdate");
+    cy.intercept("DELETE", "**/maintain/**", { statusCode: 204 }).as("deleteMaintenance");
 
-    cy.intercept("DELETE", "**/maintain/**", (req) => {
-      req.reply({ statusCode: 200 });
-    }).as("deleteMaintain");
-
+    // ตอนนี้ visit หน้า
     cy.visit(`/maintenancedetails?id=${ID}`);
-    cy.wait("@getInitial");
+    
+    // รอให้ข้อมูลโหลดเสร็จ
+    cy.wait("@getMaintenanceDetail", { timeout: 30000 });
+    cy.get("body", { timeout: 15000 }).should("contain", "Light flickering");
   });
 
   // ✅ TEST 1: โหลดข้อมูลได้ถูกต้อง
   it("should load and display maintenance details correctly", () => {
-    cy.contains("Water leakage", { timeout: 8000 }).should("exist");
-    // cy.contains("Pipe leaking near the sink").should("exist");
+    cy.contains("Light flickering", { timeout: 8000 }).should("exist");
+    cy.contains("Electrical").should("exist");
+    cy.contains("101").should("exist");
   });
 
   // ✅ TEST 2: เปิดและปิด Modal ได้ถูกต้อง
@@ -123,14 +109,16 @@ describe("E2E Full CRUD & UI Interaction Test for Maintenance Details", () => {
 
   // ✅ TEST 5: Delete ทำงานสำเร็จ  
   it("should confirm and delete maintenance record successfully", () => {
-    // ✅ ใช้ cy.request แทน window.fetch เพื่อความเสถียร
-    cy.request({
-      method: "DELETE",
-      url: `**/maintain/${ID}`,
-      failOnStatusCode: false
-    }).then((res) => {
-      expect(res.status).to.be.oneOf([200, 204, 404]); // ยอมรับ status หลากหลาย
-    });
+    // ✅ ลงทะเบียน intercept สำหรับ delete
+    cy.intercept('DELETE', `**/maintain/${ID}`, { statusCode: 204 }).as('deleteSpecific');
+    
+    // ✅ Trigger delete action
+    cy.get('button[title*="Delete"], .btn-danger').first().click({ force: true });
+    
+    // ✅ รอให้ API call เสร็จ
+    cy.wait("@deleteSpecific", { timeout: 20000 });
+    
+    cy.log("Delete operation completed successfully");
   });
 
   // ✅ TEST 6: Layout ต้องแสดงครบ
