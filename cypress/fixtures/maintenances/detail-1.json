@@ -1,13 +1,13 @@
 {
   "id": 1,
-  "roomNumber": "101",
-  "roomFloor": 1,
+  "roomNumber": "205",
+  "roomFloor": 2,
   "targetType": 0,
-  "issueTitle": "Light flickering",
-  "issueCategory": "Electrical",
-  "issueDescription": "Light in room 101 is flickering intermittently",
+  "issueTitle": "Water leakage",
+  "issueCategory": "Plumbing",
+  "issueDescription": "Pipe leaking near sink in room 205",
   "createDate": "2025-10-01T00:00:00",
-  "scheduledDate": "2025-10-03T00:00:00", 
+  "scheduledDate": "2025-10-06T00:00:00", 
   "finishDate": null,
-  "status": "Pending"
+  "status": "Open"
 }
