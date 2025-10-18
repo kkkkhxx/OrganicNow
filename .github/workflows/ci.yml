@@ -126,8 +126,8 @@ jobs:
       BASE_URL: http://localhost:5173
       HEALTH_URL_BACKEND: http://localhost:8080/actuator/health
       HEALTH_URL_FRONTEND: http://localhost:5173
-      POSTGRES_SERVICE_NAME: organicnow-db
-      POSTGRES_DB_NAME: apartment_management
+      POSTGRES_SERVICE_NAME: organicnow-db       # ✅ ADDED (จาก compose ของคุณ)
+      POSTGRES_DB_NAME: apartment_management     # ✅ ADDED (จาก compose ของคุณ)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -190,15 +190,15 @@ jobs:
       # ใช้ image Maven (เหมือน stage builder) โดย mount โค้ด backend เข้าไป
       # ตรวจหา network อัตโนมัติจาก service 'backend' ใน compose ของคุณ
       # ----------------------------
-      - name: Run Integration Tests (using Maven builder image on same network)
+      - name: Run Integration Tests (using Maven builder image on same network)  # ✅ ADDED
         run: |
           set -euo pipefail
           echo "🔎 Finding backend service & its network..."
-          BACKEND_SVC_NAME="organicnow-backend"
-          BACKEND_CID="$(docker ps --filter name=${BACKEND_SVC_NAME} --format '{{.ID}}' | head -n1)"
+          BACKEND_SVC_NAME="backend"  # ← service name ใน compose ของคุณ
+          BACKEND_CID="$(docker compose -f "${COMPOSE_FILE}" ps -q "${BACKEND_SVC_NAME}" || true)"
           if [ -z "$BACKEND_CID" ]; then
-            echo "❌ Cannot find backend container by name '${BACKEND_SVC_NAME}'."
-            docker ps
+            echo "❌ Cannot find backend container by service name '${BACKEND_SVC_NAME}'."
+            docker compose -f "${COMPOSE_FILE}" ps
             exit 1
           fi
           NET_NAME="$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$BACKEND_CID" | head -n1)"
@@ -222,7 +222,7 @@ jobs:
               -Dspring.datasource.password=postgres123 \
               -Dspring.sql.init.mode=never \
               -Dtest='*IntegrationTest'
-      - name: Upload Integration Test Reports
+      - name: Upload Integration Test Reports  # ✅ ADDED
         if: always()
         uses: actions/upload-artifact@v4
         with:
